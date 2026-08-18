@@ -1,0 +1,27 @@
+[
+  {
+    "name": "Luka Doncic",
+    "realTeam": "Dallas Mavericks",
+    "position": "PG"
+  },
+  {
+    "name": "Jayson Tatum",
+    "realTeam": "Boston Celtics",
+    "position": "SF"
+  },
+  {
+    "name": "Giannis Antetokounmpo",
+    "realTeam": "Milwaukee Bucks",
+    "position": "PF"
+  },
+  {
+    "name": "Stephen Curry",
+    "realTeam": "Golden State Warriors",
+    "position": "PG"
+  },
+  {
+    "name": "Kevin Durant",
+    "realTeam": "Phoenix Suns",
+    "position": "SF"
+  }
+]
