@@ -1,30 +1,38 @@
-import { APIGatewayProxyWebsocketHandlerV2 } from "aws-lambda";
+import type { APIGatewayProxyHandlerV2 } from "aws-lambda";
 import { randomUUID } from "node:crypto";
-import { attachDraftToConnection, getConnection } from "../lib/connection.js";
-import { sendToConnection } from "../lib/broadcast.js";
+import { requireAuth, jsonResponse, sanitizeDraft } from "../lib/http.js";
 import { putDraft } from "../lib/draftRepo.js";
-import { getPlayersForLeague } from "../lib/players.js";
+import { createRosterTable } from "../lib/rosterRepo.js";
 import { hashPassword } from "../lib/password.js";
-import type { InboundMessage, Draft } from "../lib/types.js";
+import type { Draft, OrderType } from "../lib/types.js";
 
-export const handler: APIGatewayProxyWebsocketHandlerV2 = async (event) => {
+interface CreateDraftBody {
+  name: string;
+  draftPassword: string;
+  orderType: OrderType;
+  pickTimerSeconds: number;
+  totalRounds: number;
+  teamNames: string[];
+}
+
+export const handler: APIGatewayProxyHandlerV2 = async (event) => {
+  let user;
   try {
-    const connectionId = event.requestContext.connectionId;
-    const body = JSON.parse(event.body ?? "{}") as InboundMessage;
+    user = await requireAuth(event);
+  } catch (error) {
+    console.error("Create draft auth error:", error);
+    return jsonResponse(401, { message: "Unauthorized" });
+  }
 
-    if (body.action !== "createDraft") {
-      return { statusCode: 200, body: "" };
+  try {
+    const body = JSON.parse(event.body ?? "{}") as Partial<CreateDraftBody>;
+
+    if (!body.name || !body.draftPassword || !body.orderType || !body.pickTimerSeconds || !body.totalRounds) {
+      return jsonResponse(400, { message: "Missing required fields" });
     }
 
-    const connection = await getConnection(connectionId);
-    if (!connection) {
-      await sendToConnection(connectionId, { type: "error", message: "Not connected" });
-      return { statusCode: 200, body: "" };
-    }
-
-    if (body.teamNames.length < 2) {
-      await sendToConnection(connectionId, { type: "error", message: "A draft needs at least 2 teams" });
-      return { statusCode: 200, body: "" };
+    if (!Array.isArray(body.teamNames) || body.teamNames.length < 2) {
+      return jsonResponse(400, { message: "A draft needs at least 2 teams" });
     }
 
     const draftPasswordHash = await hashPassword(body.draftPassword);
@@ -32,7 +40,7 @@ export const handler: APIGatewayProxyWebsocketHandlerV2 = async (event) => {
     const teams = body.teamNames.map((name, i) => ({
       fantasyTeamId: randomUUID(),
       name,
-      ownerUserId: i === 0 ? connection.userId : null,
+      ownerUserId: i === 0 ? user.userId : null,
     }));
 
     const draftId = randomUUID();
@@ -40,7 +48,7 @@ export const handler: APIGatewayProxyWebsocketHandlerV2 = async (event) => {
     const draft: Draft = {
       draftId,
       name: body.name,
-      sportLeague: body.sportLeague,
+      sportLeagues: ["NBA", "NFL"],
       draftPasswordHash,
       orderType: body.orderType,
       pickTimerSeconds: body.pickTimerSeconds,
@@ -51,20 +59,16 @@ export const handler: APIGatewayProxyWebsocketHandlerV2 = async (event) => {
       currentPickNumber: 1,
       currentPickDeadline: null,
       draftedPlayerIds: [],
-      commissionerUserId: connection.userId,
+      commissionerUserId: user.userId,
       createdAt: new Date().toISOString(),
     };
 
     await putDraft(draft);
-    await attachDraftToConnection(connectionId, draftId);
+    await createRosterTable(draftId);
 
-    const players = await getPlayersForLeague(draft.sportLeague);
-
-    await sendToConnection(connectionId, { type: "draftState", draft, picks: [], players });
-
-    return { statusCode: 200, body: "" };
+    return jsonResponse(201, { draft: sanitizeDraft(draft) });
   } catch (error) {
     console.error("Create draft error:", error);
-    return { statusCode: 200, body: "" };
+    return jsonResponse(500, { message: "Failed to create draft" });
   }
 };

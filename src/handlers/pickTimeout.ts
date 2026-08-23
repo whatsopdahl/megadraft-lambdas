@@ -2,10 +2,11 @@ import { PutCommand, UpdateCommand } from "@aws-sdk/lib-dynamodb";
 import { ddb } from "../lib/dynamo.js";
 import { env } from "../lib/env.js";
 import { getDraft } from "../lib/draftRepo.js";
-import { getPlayersForLeague } from "../lib/players.js";
+import { getPlayersForLeagues } from "../lib/players.js";
 import { broadcastToDraft } from "../lib/broadcast.js";
 import { teamIdForPick } from "../lib/draftOrder.js";
 import { schedulePickTimeout } from "../lib/scheduler.js";
+import { addRosterEntry } from "../lib/rosterRepo.js";
 
 export const handler = async (event: { draftId: string; pickNumber: number }): Promise<void> => {
   try {
@@ -17,7 +18,7 @@ export const handler = async (event: { draftId: string; pickNumber: number }): P
 
     const onClockTeamId = teamIdForPick(draft, event.pickNumber);
 
-    const players = await getPlayersForLeague(draft.sportLeague);
+    const players = await getPlayersForLeagues(draft.sportLeagues);
     const available = players.filter((p) => !draft.draftedPlayerIds.includes(p.playerId));
 
     if (available.length === 0) {
@@ -75,6 +76,14 @@ export const handler = async (event: { draftId: string; pickNumber: number }): P
         },
       }),
     );
+
+    await addRosterEntry(event.draftId, {
+      fantasyTeamId: onClockTeamId,
+      playerId: autoPlayer.playerId,
+      pickNumber,
+      pickedByUserId: null,
+      pickedAt,
+    });
 
     if (!isLastPick) {
       await schedulePickTimeout(event.draftId, nextPickNumber, nextDeadline!);

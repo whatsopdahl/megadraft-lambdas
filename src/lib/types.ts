@@ -1,4 +1,4 @@
-export type SportLeague = "NBA" | "NFL" | "MLB";
+export type SportLeague = "NBA" | "NFL" ;
 export type OrderType = "snake" | "linear";
 export type DraftStatus = "pending" | "active" | "complete";
 
@@ -11,7 +11,7 @@ export interface FantasyTeam {
 export interface Draft {
   draftId: string;
   name: string;
-  sportLeague: SportLeague;
+  sportLeagues: SportLeague[];
   draftPasswordHash: string;
   orderType: OrderType;
   pickTimerSeconds: number;
@@ -52,10 +52,10 @@ export interface ConnectionRecord {
   expiresAt: number;
 }
 
-// Inbound WebSocket action messages (client -> server), routed by "action"
+// Inbound WebSocket action messages (client -> server), routed by "action".
+// createDraft/joinDraft live on the REST API (see handlers/createDraft.ts,
+// handlers/joinDraft.ts) - the WebSocket API is draft-room-only.
 export type InboundMessage =
-  | { action: "createDraft"; name: string; sportLeague: SportLeague; draftPassword: string; orderType: OrderType; pickTimerSeconds: number; totalRounds: number; teamNames: string[] }
-  | { action: "joinDraft"; draftId: string; draftPassword: string; fantasyTeamId: string }
   | { action: "startDraft"; draftId: string }
   | { action: "makePick"; draftId: string; playerId: string }
   | { action: "getDraftState"; draftId: string };
@@ -65,4 +65,5 @@ export type OutboundMessage =
   | { type: "draftState"; draft: Draft; picks: DraftPick[]; players: Player[] }
   | { type: "pickMade"; pick: DraftPick; draft: Draft }
   | { type: "draftStarted"; draft: Draft }
+  | { type: "draftUpdated"; draft: Draft }
   | { type: "error"; message: string };

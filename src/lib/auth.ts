@@ -1,14 +1,14 @@
-import { CognitoJwtVerifier } from "aws-jwt-verify";
+import { JwtRsaVerifier } from "aws-jwt-verify";
 import { env } from "./env.js";
 
-let verifier: ReturnType<typeof CognitoJwtVerifier.create> | null = null;
+let verifier: ReturnType<typeof JwtRsaVerifier.create> | null = null;
 
 function getVerifier() {
   if (!verifier) {
-    verifier = CognitoJwtVerifier.create({
-      userPoolId: env.cognitoUserPoolId,
-      tokenUse: "id",
-      clientId: env.cognitoClientId,
+    verifier = JwtRsaVerifier.create({
+      issuer: "https://accounts.google.com",
+      audience: env.googleClientId,
+      jwksUri: "https://www.googleapis.com/oauth2/v3/certs",
     });
   }
   return verifier;
@@ -20,7 +20,7 @@ export interface AuthenticatedUser {
 }
 
 /**
- * Verifies a Cognito ID token (passed as a WebSocket $connect query-string
+ * Verifies a Google ID token (passed as a WebSocket $connect query-string
  * param, since the WS handshake can't carry custom headers) and returns the
  * caller's identity. Throws if the token is missing/invalid/expired.
  */
@@ -30,6 +30,10 @@ export async function verifyIdToken(idToken: string | undefined): Promise<Authen
   }
 
   const payload = await getVerifier().verify(idToken);
+
+  if (!payload.sub) {
+    throw new Error("ID token missing sub claim");
+  }
 
   return {
     userId: payload.sub,

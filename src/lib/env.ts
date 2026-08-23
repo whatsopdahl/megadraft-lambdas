@@ -19,11 +19,8 @@ export const env = {
   get draftPicksTable() {
     return required("DRAFT_PICKS_TABLE");
   },
-  get cognitoUserPoolId() {
-    return required("COGNITO_USER_POOL_ID");
-  },
-  get cognitoClientId() {
-    return required("COGNITO_CLIENT_ID");
+  get googleClientId() {
+    return required("GOOGLE_CLIENT_ID");
   },
   get webSocketManagementEndpoint() {
     return required("WEBSOCKET_MANAGEMENT_ENDPOINT");

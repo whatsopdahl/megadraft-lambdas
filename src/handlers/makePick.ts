@@ -5,9 +5,10 @@ import { env } from "../lib/env.js";
 import { getConnection } from "../lib/connection.js";
 import { sendToConnection, broadcastToDraft } from "../lib/broadcast.js";
 import { getDraft } from "../lib/draftRepo.js";
-import { getPlayer } from "../lib/players.js";
+import { getPlayerInLeagues } from "../lib/players.js";
 import { teamIdForPick } from "../lib/draftOrder.js";
 import { schedulePickTimeout, cancelPickTimeout } from "../lib/scheduler.js";
+import { addRosterEntry } from "../lib/rosterRepo.js";
 import type { InboundMessage } from "../lib/types.js";
 
 export const handler: APIGatewayProxyWebsocketHandlerV2 = async (event) => {
@@ -51,7 +52,7 @@ export const handler: APIGatewayProxyWebsocketHandlerV2 = async (event) => {
       return { statusCode: 200, body: "" };
     }
 
-    const player = await getPlayer(draft.sportLeague, body.playerId);
+    const player = await getPlayerInLeagues(draft.sportLeagues, body.playerId);
     if (!player) {
       await sendToConnection(connectionId, { type: "error", message: "Invalid player" });
       return { statusCode: 200, body: "" };
@@ -106,6 +107,14 @@ export const handler: APIGatewayProxyWebsocketHandlerV2 = async (event) => {
         },
       }),
     );
+
+    await addRosterEntry(body.draftId, {
+      fantasyTeamId: onClockTeamId,
+      playerId: body.playerId,
+      pickNumber,
+      pickedByUserId: userId,
+      pickedAt,
+    });
 
     await cancelPickTimeout(body.draftId, pickNumber);
 

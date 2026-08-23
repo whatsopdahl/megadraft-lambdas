@@ -1,0 +1,98 @@
+name: Deploy Lambdas
+
+# Push to main deploys the merged code to dev automatically. Any branch can
+# be pushed to prod (or dev) on demand via workflow_dispatch - useful for
+# redeploying a hotfix branch or promoting a specific commit without first
+# merging it to main.
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+    inputs:
+      branch:
+        description: "Branch to build and deploy"
+        required: true
+        default: main
+      environment:
+        description: "Target environment"
+        type: choice
+        options: [dev, prod]
+        default: dev
+        required: true
+
+permissions:
+  id-token: write # required to assume the AWS role via OIDC
+  contents: read
+
+concurrency:
+  # Terraform's S3 lockfile would serialize concurrent applies to the same
+  # env anyway; this just avoids piling up queued runs behind that lock.
+  group: deploy-${{ github.event.inputs.environment || 'dev' }}
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    environment: ${{ github.event.inputs.environment || 'dev' }}
+    steps:
+      - name: Resolve deploy target
+        id: target
+        run: |
+          echo "branch=${{ github.event.inputs.branch || github.ref_name }}" >> "$GITHUB_OUTPUT"
+          echo "environment=${{ github.event.inputs.environment || 'dev' }}" >> "$GITHUB_OUTPUT"
+
+      # Checked out under lambda/ so its path lines up with the infra
+      # repo's default lambda_dist_dir (../../../lambda/dist relative to
+      # infrastructure/envs/<env>), same layout as local development.
+      - name: Checkout lambda (${{ steps.target.outputs.branch }})
+        uses: actions/checkout@v4
+        with:
+          path: lambda
+          ref: ${{ steps.target.outputs.branch }}
+
+      - name: Checkout infrastructure
+        uses: actions/checkout@v4
+        with:
+          repository: whatsopdahl/megadraft-infra
+          path: infrastructure
+          token: ${{ secrets.INFRA_REPO_PAT }}
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 9
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: pnpm
+          cache-dependency-path: lambda/pnpm-lock.yaml
+
+      - name: Install lambda dependencies
+        working-directory: lambda
+        run: pnpm install --frozen-lockfile
+
+      - name: Build lambdas
+        working-directory: lambda
+        run: pnpm build
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_DEPLOY_ROLE_ARN }}
+          aws-region: us-east-1
+
+      - uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: "1.9.8"
+
+      - name: Terraform init
+        working-directory: infrastructure/envs/${{ steps.target.outputs.environment }}
+        run: terraform init
+
+      - name: Terraform apply
+        working-directory: infrastructure/envs/${{ steps.target.outputs.environment }}
+        env:
+          # google_client_id is a public value (README: "safe to commit")
+          # but isn't in the committed *.tfvars - only in gitignored
+          # *.tfvars.local - so CI supplies it via a repo variable instead.
+          TF_VAR_google_client_id: ${{ vars.GOOGLE_CLIENT_ID }}
+        run: terraform apply -auto-approve -var-file=${{ steps.target.outputs.environment }}.tfvars

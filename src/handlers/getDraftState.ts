@@ -2,7 +2,7 @@ import { APIGatewayProxyWebsocketHandlerV2 } from "aws-lambda";
 import { getConnection } from "../lib/connection.js";
 import { sendToConnection } from "../lib/broadcast.js";
 import { getDraft, getPicksForDraft } from "../lib/draftRepo.js";
-import { getPlayersForLeague } from "../lib/players.js";
+import { getPlayersForLeagues } from "../lib/players.js";
 import type { InboundMessage } from "../lib/types.js";
 
 export const handler: APIGatewayProxyWebsocketHandlerV2 = async (event) => {
@@ -27,7 +27,7 @@ export const handler: APIGatewayProxyWebsocketHandlerV2 = async (event) => {
     }
 
     const picks = await getPicksForDraft(body.draftId);
-    const players = await getPlayersForLeague(draft.sportLeague);
+    const players = await getPlayersForLeagues(draft.sportLeagues);
 
     await sendToConnection(connectionId, { type: "draftState", draft, picks, players });
 

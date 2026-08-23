@@ -4,7 +4,7 @@ import { promisify } from "node:util";
 const scrypt = promisify(scryptCallback);
 const KEY_LENGTH = 64;
 
-/** Hashes a draft join password as `salt:hash` (hex), independent of Cognito credentials. */
+/** Hashes a draft join password as `salt:hash` (hex), independent of the user's Google login. */
 export async function hashPassword(password: string): Promise<string> {
   const salt = randomBytes(16).toString("hex");
   const derived = (await scrypt(password, salt, KEY_LENGTH)) as Buffer;

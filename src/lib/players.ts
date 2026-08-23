@@ -25,3 +25,23 @@ export async function getPlayer(sportLeague: SportLeague, playerId: string): Pro
 
   return result.Item as Player | undefined;
 }
+
+/** Full player pool across every league a draft spans. */
+export async function getPlayersForLeagues(sportLeagues: SportLeague[]): Promise<Player[]> {
+  const players: Player[] = [];
+  for (const league of sportLeagues) {
+    players.push(...(await getPlayersForLeague(league)));
+  }
+  return players;
+}
+
+/** Looks a player up across every league a draft spans (the league isn't known up-front). */
+export async function getPlayerInLeagues(sportLeagues: SportLeague[], playerId: string): Promise<Player | undefined> {
+  for (const league of sportLeagues) {
+    const player = await getPlayer(league, playerId);
+    if (player) {
+      return player;
+    }
+  }
+  return undefined;
+}
