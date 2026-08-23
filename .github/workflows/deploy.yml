@@ -82,7 +82,9 @@ jobs:
 
       - uses: hashicorp/setup-terraform@v3
         with:
-          terraform_version: "1.9.8"
+          # >= 1.10 required: backend.tf uses use_lockfile (S3 native state
+          # locking), which older Terraform CLI versions reject outright.
+          terraform_version: "1.15.8"
 
       - name: Terraform init
         working-directory: infrastructure/envs/${{ steps.target.outputs.environment }}
