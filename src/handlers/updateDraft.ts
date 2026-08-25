@@ -6,6 +6,8 @@ import { env } from "../lib/env.js";
 import { requireAuth, jsonResponse, sanitizeDraft } from "../lib/http.js";
 import { broadcastToDraft } from "../lib/broadcast.js";
 import { getDraft } from "../lib/draftRepo.js";
+import { hashPassword } from "../lib/password.js";
+import { DEFAULT_TEAM_COLORS } from "../lib/teamColors.js";
 import type { OrderType } from "../lib/types.js";
 
 interface UpdateDraftBody {
@@ -13,6 +15,8 @@ interface UpdateDraftBody {
   orderType?: OrderType;
   pickTimerSeconds?: number;
   totalRounds?: number;
+  scheduledStartTime?: string;
+  draftPassword?: string;
   teamNames?: string[];
 }
 
@@ -58,6 +62,15 @@ export const handler: APIGatewayProxyHandlerV2 = async (event) => {
     if (body.totalRounds !== undefined) {
       draft.totalRounds = body.totalRounds;
     }
+    if (body.scheduledStartTime !== undefined) {
+      if (Number.isNaN(new Date(body.scheduledStartTime).getTime())) {
+        return jsonResponse(400, { message: "Invalid scheduledStartTime" });
+      }
+      draft.scheduledStartTime = body.scheduledStartTime;
+    }
+    if (body.draftPassword !== undefined) {
+      draft.draftPasswordHash = await hashPassword(body.draftPassword);
+    }
     if (body.teamNames !== undefined) {
       if (!Array.isArray(body.teamNames) || body.teamNames.length < 2) {
         return jsonResponse(400, { message: "A draft needs at least 2 teams" });
@@ -69,6 +82,8 @@ export const handler: APIGatewayProxyHandlerV2 = async (event) => {
         fantasyTeamId: draft.teams[i]?.fantasyTeamId ?? randomUUID(),
         name,
         ownerUserId: null,
+        color: draft.teams[i]?.color ?? DEFAULT_TEAM_COLORS[i % DEFAULT_TEAM_COLORS.length],
+        autodraft: false,
       }));
       draft.pickOrderTeamIds = draft.teams.map((t) => t.fantasyTeamId);
     }

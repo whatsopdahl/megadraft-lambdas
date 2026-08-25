@@ -6,6 +6,8 @@ export interface FantasyTeam {
   fantasyTeamId: string;
   name: string;
   ownerUserId: string | null;
+  color: string;
+  autodraft: boolean;
 }
 
 export interface Draft {
@@ -16,6 +18,7 @@ export interface Draft {
   orderType: OrderType;
   pickTimerSeconds: number;
   totalRounds: number;
+  scheduledStartTime: string;
   status: DraftStatus;
   teams: FantasyTeam[];
   pickOrderTeamIds: string[];

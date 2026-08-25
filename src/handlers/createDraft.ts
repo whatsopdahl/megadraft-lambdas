@@ -4,6 +4,7 @@ import { requireAuth, jsonResponse, sanitizeDraft } from "../lib/http.js";
 import { putDraft } from "../lib/draftRepo.js";
 import { createRosterTable } from "../lib/rosterRepo.js";
 import { hashPassword } from "../lib/password.js";
+import { DEFAULT_TEAM_COLORS } from "../lib/teamColors.js";
 import type { Draft, OrderType } from "../lib/types.js";
 
 interface CreateDraftBody {
@@ -12,6 +13,7 @@ interface CreateDraftBody {
   orderType: OrderType;
   pickTimerSeconds: number;
   totalRounds: number;
+  scheduledStartTime: string;
   teamNames: string[];
 }
 
@@ -27,8 +29,19 @@ export const handler: APIGatewayProxyHandlerV2 = async (event) => {
   try {
     const body = JSON.parse(event.body ?? "{}") as Partial<CreateDraftBody>;
 
-    if (!body.name || !body.draftPassword || !body.orderType || !body.pickTimerSeconds || !body.totalRounds) {
+    if (
+      !body.name ||
+      !body.draftPassword ||
+      !body.orderType ||
+      !body.pickTimerSeconds ||
+      !body.totalRounds ||
+      !body.scheduledStartTime
+    ) {
       return jsonResponse(400, { message: "Missing required fields" });
+    }
+
+    if (Number.isNaN(new Date(body.scheduledStartTime).getTime())) {
+      return jsonResponse(400, { message: "Invalid scheduledStartTime" });
     }
 
     if (!Array.isArray(body.teamNames) || body.teamNames.length < 2) {
@@ -41,6 +54,8 @@ export const handler: APIGatewayProxyHandlerV2 = async (event) => {
       fantasyTeamId: randomUUID(),
       name,
       ownerUserId: i === 0 ? user.userId : null,
+      color: DEFAULT_TEAM_COLORS[i % DEFAULT_TEAM_COLORS.length],
+      autodraft: false,
     }));
 
     const draftId = randomUUID();
@@ -53,6 +68,7 @@ export const handler: APIGatewayProxyHandlerV2 = async (event) => {
       orderType: body.orderType,
       pickTimerSeconds: body.pickTimerSeconds,
       totalRounds: body.totalRounds,
+      scheduledStartTime: body.scheduledStartTime,
       status: "pending",
       teams,
       pickOrderTeamIds: teams.map((t) => t.fantasyTeamId),
