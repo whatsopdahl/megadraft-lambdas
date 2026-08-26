@@ -14,8 +14,15 @@ terraform {
 # aws_secretsmanager_secret_version resource) so espn_s2/SWID never touch
 # Terraform state or this repo - set it once via the AWS CLI/console (see
 # README).
+#
+# Named "...-v2-..." rather than "...-espn-credentials-<env>" because the
+# first attempt at this name got force-deleted during initial setup and hit
+# AWS's Secrets Manager tombstone-replication lag (CreateSecret kept
+# rejecting with "already scheduled for deletion" well after DescribeSecret
+# showed it gone) - picking a fresh name sidesteps that entirely rather than
+# waiting on AWS-side propagation with no ETA.
 resource "aws_secretsmanager_secret" "espn_credentials" {
-  name        = "fantasy-draft/espn-credentials-${var.env}"
+  name        = "fantasy-draft/espn-credentials-v2-${var.env}"
   description = "ESPN fantasy cookies (espn_s2, SWID) and league IDs/years used by syncEspnPlayers"
 }
 

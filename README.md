@@ -34,7 +34,7 @@ Pulls free agents from an NFL and an NBA league you're in on ESPN and writes the
 
 **One-time setup - provide your ESPN authentication:**
 
-`modules/player-sync` creates (but never populates) a Secrets Manager secret named `fantasy-draft/espn-credentials-<env>`. Terraform intentionally never touches its value, so espn_s2/SWID never land in Terraform state or this repo. After the first `terraform apply` creates the empty secret, set its value yourself:
+`modules/player-sync` creates (but never populates) a Secrets Manager secret named `fantasy-draft/espn-credentials-v2-<env>`. Terraform intentionally never touches its value, so espn_s2/SWID never land in Terraform state or this repo. After the first `terraform apply` creates the empty secret, set its value yourself:
 
 1. Log into [espn.com](https://www.espn.com) in a browser, with access to both fantasy leagues you want synced.
 2. Open DevTools → Application (Chrome) or Storage (Firefox) → Cookies → `https://www.espn.com`, and copy the values of the `espn_s2` and `SWID` cookies (`SWID` includes its `{...}` braces - copy it exactly).
@@ -43,7 +43,7 @@ Pulls free agents from an NFL and an NBA league you're in on ESPN and writes the
 
    ```sh
    aws secretsmanager put-secret-value \
-     --secret-id fantasy-draft/espn-credentials-dev \
+     --secret-id fantasy-draft/espn-credentials-v2-dev \
      --secret-string '{
        "espnS2": "<espn_s2 cookie value>",
        "swid": "{<SWID cookie value>}",
@@ -52,7 +52,7 @@ Pulls free agents from an NFL and an NBA league you're in on ESPN and writes the
      }'
    ```
 
-   Repeat with `fantasy-draft/espn-credentials-prod` for prod. Re-run this whenever the cookies expire (ESPN sessions are long-lived but not permanent) or the season year rolls over.
+   Repeat with `fantasy-draft/espn-credentials-v2-prod` for prod. Re-run this whenever the cookies expire (ESPN sessions are long-lived but not permanent) or the season year rolls over.
 
 **Running it:**
 
