@@ -43,23 +43,25 @@ async function loadEspnSecret(): Promise<EspnSecret> {
   return JSON.parse(result.SecretString) as EspnSecret;
 }
 
-async function fetchNflPlayers(secret: EspnSecret, cookies: EspnCookies): Promise<Player[]> {
+async function fetchNflPlayers(secret: EspnSecret, cookies: EspnCookies, maxPlayersPerLeague?: number): Promise<Player[]> {
   const { leagueId, year } = secret.nfl;
   const week = await fetchCurrentScoringPeriod("nfl", leagueId, year, cookies);
 
   const players: Player[] = [];
   for (const group of NFL_POSITION_GROUPS) {
-    const rawPlayers = await fetchFreeAgents("nfl", leagueId, year, week, group.size, group.slotId, cookies);
+    const size = maxPlayersPerLeague === undefined ? group.size : Math.min(group.size, maxPlayersPerLeague);
+    const rawPlayers = await fetchFreeAgents("nfl", leagueId, year, week, size, group.slotId, cookies);
     players.push(...rawPlayers.map((raw) => ({ sportLeague: "NFL" as const, ...toFootballPlayerFields(raw) })));
   }
   return players;
 }
 
-async function fetchNbaPlayers(secret: EspnSecret, cookies: EspnCookies): Promise<Player[]> {
+async function fetchNbaPlayers(secret: EspnSecret, cookies: EspnCookies, maxPlayersPerLeague?: number): Promise<Player[]> {
   const { leagueId, year } = secret.nba;
   const week = await fetchCurrentScoringPeriod("nba", leagueId, year, cookies);
 
-  const rawPlayers = await fetchFreeAgents("nba", leagueId, year, week, NBA_ALL_PLAYERS_SIZE, undefined, cookies);
+  const size = maxPlayersPerLeague === undefined ? NBA_ALL_PLAYERS_SIZE : Math.min(NBA_ALL_PLAYERS_SIZE, maxPlayersPerLeague);
+  const rawPlayers = await fetchFreeAgents("nba", leagueId, year, week, size, undefined, cookies);
   return rawPlayers.map((raw) => ({ sportLeague: "NBA" as const, ...toBasketballPlayerFields(raw) }));
 }
 
@@ -77,11 +79,20 @@ async function batchWritePlayers(players: Player[]): Promise<void> {
   }
 }
 
-export const handler = async (): Promise<{ nfl: number; nba: number }> => {
+interface SyncEspnPlayersEvent {
+  /** Caps players fetched per position group (NFL) / per league (NBA) - for cheap test invokes, not for production use. */
+  maxPlayersPerLeague?: number;
+}
+
+export const handler = async (event?: SyncEspnPlayersEvent): Promise<{ nfl: number; nba: number }> => {
   const secret = await loadEspnSecret();
   const cookies: EspnCookies = { espnS2: secret.espnS2, swid: secret.swid };
+  const { maxPlayersPerLeague } = event ?? {};
 
-  const [nflPlayers, nbaPlayers] = await Promise.all([fetchNflPlayers(secret, cookies), fetchNbaPlayers(secret, cookies)]);
+  const [nflPlayers, nbaPlayers] = await Promise.all([
+    fetchNflPlayers(secret, cookies, maxPlayersPerLeague),
+    fetchNbaPlayers(secret, cookies, maxPlayersPerLeague),
+  ]);
 
   await batchWritePlayers(nflPlayers);
   await batchWritePlayers(nbaPlayers);

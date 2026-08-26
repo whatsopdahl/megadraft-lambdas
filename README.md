@@ -62,6 +62,13 @@ aws lambda invoke --function-name fantasy-draft-syncEspnPlayers-dev /dev/stdout
 
 Safe to re-run any time - it upserts by ESPN player id, so repeated runs just refresh ranking/injury status rather than creating duplicates.
 
+For a cheap test run, pass `maxPlayersPerLeague` to cap how many players are fetched per NFL position group / for NBA overall (instead of the full 100-1000):
+
+```sh
+aws lambda invoke --function-name fantasy-draft-syncEspnPlayers-dev \
+  --payload '{"maxPlayersPerLeague": 5}' --cli-binary-format raw-in-base64-out /dev/stdout
+```
+
 ## Infrastructure (`infrastructure/`)
 
 This repo owns the Terraform for everything that has to be built from its own `dist/` output: the REST API and WebSocket API Lambda functions, their IAM roles, log groups, and API Gateway routes (`infrastructure/modules/rest-api`, `infrastructure/modules/websocket-api`, wired together per environment under `infrastructure/envs/{dev,prod}`). This used to live in [megadraft-infra](https://github.com/whatsopdahl/megadraft-infra) and get built via a cross-repo checkout, which broke every time a new handler was added and the two repos' pushes landed out of order (or one hadn't landed yet). Moving the Terraform here removes that race by construction - one repo, one checkout, one CI run building and applying its own artifacts.
