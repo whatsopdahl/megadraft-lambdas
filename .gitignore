@@ -13,3 +13,5 @@ data/*.json
 crash.log
 override.tf
 override.tf.json
+
+*secret

@@ -12,15 +12,23 @@ export interface EspnCookies {
   swid: string;
 }
 
-interface RawEspnPlayer {
+interface RawEspnPlayerDetail {
   id: number;
   fullName: string;
   proTeamId: number;
   defaultPositionId?: number;
   eligibleSlots?: number[];
   injuryStatus?: string;
-  positionalRanking?: number;
   expectedReturnDate?: number[];
+}
+
+/** One item of the free-agents response's "players" array. */
+interface RawEspnEntry {
+  player?: RawEspnPlayerDetail;
+  playerPoolEntry?: { player: RawEspnPlayerDetail };
+  // Keyed by scoring-period id ("0" is the season-total entry ESPN uses for
+  // free-agent listings) - positionalRanking lives here, NOT on "player".
+  ratings?: Record<string, { positionalRanking?: number }>;
 }
 
 export interface EspnPlayerFields {
@@ -218,7 +226,7 @@ export async function fetchFreeAgents(
   size: number,
   slotId?: number,
   cookies?: EspnCookies,
-): Promise<RawEspnPlayer[]> {
+): Promise<RawEspnEntry[]> {
   const params = new URLSearchParams({ view: "kona_player_info", scoringPeriodId: String(week) });
   const filter = {
     players: {
@@ -235,7 +243,20 @@ export async function fetchFreeAgents(
     "x-fantasy-filter": JSON.stringify(filter),
   });
 
-  return (data.players ?? []).map((entry: any) => entry.player ?? entry.playerPoolEntry?.player ?? entry);
+  // Deliberately NOT unwrapping to entry.player here: positionalRanking
+  // lives on entry.ratings (a sibling of "player", not inside it), so
+  // to*PlayerFields below need the whole entry.
+  return data.players ?? [];
+}
+
+function extractPlayer(entry: RawEspnEntry): RawEspnPlayerDetail {
+  return entry.player ?? entry.playerPoolEntry?.player ?? (entry as unknown as RawEspnPlayerDetail);
+}
+
+function extractRanking(entry: RawEspnEntry): number {
+  const ratings = entry.ratings ?? {};
+  const rating = ratings["0"] ?? ratings[Object.keys(ratings)[0]];
+  return rating?.positionalRanking ?? 0;
 }
 
 function realPositions(eligibleSlots: number[] | undefined, posMap: Record<number, string>, real: Set<string>): string[] {
@@ -257,7 +278,8 @@ function toIsoDate(parts: number[] | undefined): string | undefined {
   return `${year}-${String(month).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
 }
 
-export function toFootballPlayerFields(player: RawEspnPlayer): EspnPlayerFields {
+export function toFootballPlayerFields(entry: RawEspnEntry): EspnPlayerFields {
+  const player = extractPlayer(entry);
   const positions = realPositions(player.eligibleSlots, FOOTBALL_POSITION_MAP, FOOTBALL_REAL_POSITIONS);
   return {
     playerId: String(player.id),
@@ -265,13 +287,14 @@ export function toFootballPlayerFields(player: RawEspnPlayer): EspnPlayerFields 
     realTeam: FOOTBALL_PRO_TEAM_MAP[player.proTeamId] ?? "FA",
     position: positions[0] ?? "",
     positions,
-    ranking: player.positionalRanking ?? 0,
+    ranking: extractRanking(entry),
     injuryStatus: player.injuryStatus ?? "ACTIVE",
     estimatedReturnDate: toIsoDate(player.expectedReturnDate),
   };
 }
 
-export function toBasketballPlayerFields(player: RawEspnPlayer): EspnPlayerFields {
+export function toBasketballPlayerFields(entry: RawEspnEntry): EspnPlayerFields {
+  const player = extractPlayer(entry);
   const positions = realPositions(player.eligibleSlots, BASKETBALL_POSITION_MAP, BASKETBALL_REAL_POSITIONS);
   // Basketball's raw defaultPositionId is 1-indexed against this same map
   // (1 => PG), unlike eligibleSlots/lineupSlotId which are 0-indexed.
@@ -282,7 +305,7 @@ export function toBasketballPlayerFields(player: RawEspnPlayer): EspnPlayerField
     realTeam: BASKETBALL_PRO_TEAM_MAP[player.proTeamId] ?? "FA",
     position: primary ?? positions[0] ?? "",
     positions,
-    ranking: player.positionalRanking ?? 0,
+    ranking: extractRanking(entry),
     injuryStatus: player.injuryStatus ?? "ACTIVE",
     estimatedReturnDate: toIsoDate(player.expectedReturnDate),
   };
