@@ -90,11 +90,16 @@ resource "aws_lambda_function" "handler" {
   # ceiling is 900s if more headroom is ever needed).
   timeout     = 600
   memory_size = 256
-  # Only one sync should ever be in flight against ESPN at a time. With this
-  # set, invoking the function again while a run is still active fails fast
-  # with TooManyRequestsException instead of running concurrently and
-  # doubling up on ESPN traffic.
-  reserved_concurrent_executions = 1
+  # reserved_concurrent_executions = 1 (only one sync should ever be in
+  # flight against ESPN at a time) is deliberately omitted for now - this
+  # account's Lambda concurrency quota is stuck at AWS's 10-execution
+  # minimum, and reserving even 1 here would push unreserved below that
+  # floor (AccountLimit.UnreservedConcurrentExecutions must stay >= 10).
+  # A quota increase to 1000 is pending (Service Quotas request
+  # dbd1cda185f3424594fc2fbf31817ab5altXn6IR, service code lambda, quota
+  # L-B99A9384) - once it clears, add this back:
+  #   reserved_concurrent_executions = 1
+
 
   environment {
     variables = {
