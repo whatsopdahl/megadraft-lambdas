@@ -83,10 +83,18 @@ resource "aws_lambda_function" "handler" {
   filename         = data.archive_file.handler.output_path
   source_code_hash = data.archive_file.handler.output_base64sha256
   # ESPN's free-agent endpoint is called once per NFL position group plus
-  # once for all NBA players (7 sequential-ish HTTP calls) - longer than the
-  # 10s used by the request/response handlers.
-  timeout     = 60
+  # once for all NBA players (~9 HTTP calls, NFL mostly sequential/NBA in
+  # parallel). espnGet() retries on 429/5xx with exponential backoff, so a
+  # throttled run can legitimately take minutes rather than seconds - 600s
+  # comfortably covers worst-case backoff across every call (Lambda's hard
+  # ceiling is 900s if more headroom is ever needed).
+  timeout     = 600
   memory_size = 256
+  # Only one sync should ever be in flight against ESPN at a time. With this
+  # set, invoking the function again while a run is still active fails fast
+  # with TooManyRequestsException instead of running concurrently and
+  # doubling up on ESPN traffic.
+  reserved_concurrent_executions = 1
 
   environment {
     variables = {

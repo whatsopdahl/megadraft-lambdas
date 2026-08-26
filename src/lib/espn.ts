@@ -192,12 +192,56 @@ function cookieHeader(cookies?: EspnCookies): Record<string, string> {
   return cookies ? { Cookie: `espn_s2=${cookies.espnS2}; SWID=${cookies.swid}` } : {};
 }
 
+const MAX_RETRIES = 5;
+const BASE_RETRY_DELAY_MS = 1000;
+const MAX_RETRY_AFTER_MS = 120_000;
+
+function sleep(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+function isRetryableStatus(status: number): boolean {
+  // 429 is ESPN's throttling signal; 5xx are transient server errors. Other
+  // 4xx (401/403/404) mean bad credentials/league/year, not throttling -
+  // retrying those would just burn the timeout budget on a request that can
+  // never succeed.
+  return status === 429 || status >= 500;
+}
+
+function backoffDelay(attempt: number): number {
+  const exp = BASE_RETRY_DELAY_MS * 2 ** attempt;
+  return exp + Math.random() * exp * 0.3;
+}
+
+/** Retries on ESPN throttling (429), transient 5xx, and network errors. */
 async function espnGet(url: string, headers: Record<string, string>): Promise<any> {
-  const res = await fetch(url, { headers });
-  if (!res.ok) {
-    throw new Error(`ESPN API request failed: ${res.status} ${res.statusText} (${url})`);
+  for (let attempt = 0; ; attempt++) {
+    let res: Response;
+    try {
+      res = await fetch(url, { headers });
+    } catch (err) {
+      if (attempt >= MAX_RETRIES) {
+        throw err;
+      }
+      const delay = backoffDelay(attempt);
+      console.warn(`ESPN API request errored on attempt ${attempt + 1}/${MAX_RETRIES + 1}, retrying in ${Math.round(delay)}ms (${url}): ${err}`);
+      await sleep(delay);
+      continue;
+    }
+
+    if (res.ok) {
+      return res.json();
+    }
+
+    if (!isRetryableStatus(res.status) || attempt >= MAX_RETRIES) {
+      throw new Error(`ESPN API request failed: ${res.status} ${res.statusText} (${url})`);
+    }
+
+    const retryAfterHeader = res.headers.get("retry-after");
+    const delay = retryAfterHeader ? Math.min(Number(retryAfterHeader) * 1000, MAX_RETRY_AFTER_MS) : backoffDelay(attempt);
+    console.warn(`ESPN API ${res.status} on attempt ${attempt + 1}/${MAX_RETRIES + 1}, retrying in ${Math.round(delay)}ms (${url})`);
+    await sleep(delay);
   }
-  return res.json();
 }
 
 /**

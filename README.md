@@ -62,6 +62,8 @@ aws lambda invoke --function-name fantasy-draft-syncEspnPlayers-dev /dev/stdout
 
 Safe to re-run any time - it upserts by ESPN player id, so repeated runs just refresh ranking/injury status rather than creating duplicates.
 
+**Throttling:** if ESPN throttles (429) or returns a transient 5xx, `espnGet()` retries automatically with exponential backoff (up to 5 retries, honoring ESPN's `Retry-After` header when present) - check CloudWatch Logs for `console.warn` retry lines if a run takes longer than expected. The function's timeout is 10 minutes to give backoff room to work. It also has `reserved_concurrent_executions = 1`, so invoking it again while a sync is already running fails immediately with `TooManyRequestsException` instead of running concurrently - wait for the current run to finish (check CloudWatch Logs) before re-invoking.
+
 For a cheap test run, pass `maxPlayersPerLeague` to cap how many players are fetched per NFL position group / for NBA overall (instead of the full 100-1000):
 
 ```sh
