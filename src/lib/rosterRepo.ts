@@ -1,4 +1,4 @@
-import { CreateTableCommand, DynamoDBClient } from "@aws-sdk/client-dynamodb";
+import { CreateTableCommand, DeleteTableCommand, DynamoDBClient } from "@aws-sdk/client-dynamodb";
 import { PutCommand } from "@aws-sdk/lib-dynamodb";
 import { ddb } from "./dynamo.js";
 
@@ -40,6 +40,17 @@ export async function createRosterTable(draftId: string): Promise<void> {
     );
   } catch (error) {
     if ((error as { name?: string }).name !== "ResourceInUseException") {
+      throw error;
+    }
+  }
+}
+
+/** Tears down the per-draft roster table when the draft itself is deleted. */
+export async function deleteRosterTable(draftId: string): Promise<void> {
+  try {
+    await rawClient.send(new DeleteTableCommand({ TableName: rosterTableName(draftId) }));
+  } catch (error) {
+    if ((error as { name?: string }).name !== "ResourceNotFoundException") {
       throw error;
     }
   }
