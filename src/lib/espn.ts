@@ -27,8 +27,9 @@ interface RawEspnEntry {
   player?: RawEspnPlayerDetail;
   playerPoolEntry?: { player: RawEspnPlayerDetail };
   // Keyed by scoring-period id ("0" is the season-total entry ESPN uses for
-  // free-agent listings) - positionalRanking lives here, NOT on "player".
-  ratings?: Record<string, { positionalRanking?: number }>;
+  // free-agent listings) - positionalRanking/totalRanking live here, NOT on
+  // "player". totalRanking is the overall (position-agnostic) rank.
+  ratings?: Record<string, { positionalRanking?: number; totalRanking?: number }>;
 }
 
 export interface EspnPlayerFields {
@@ -38,6 +39,7 @@ export interface EspnPlayerFields {
   position: string;
   positions: string[];
   ranking: number;
+  overallRanking: number;
   injuryStatus: string;
   estimatedReturnDate?: string;
 }
@@ -253,10 +255,9 @@ function extractPlayer(entry: RawEspnEntry): RawEspnPlayerDetail {
   return entry.player ?? entry.playerPoolEntry?.player ?? (entry as unknown as RawEspnPlayerDetail);
 }
 
-function extractRanking(entry: RawEspnEntry): number {
+function extractRating(entry: RawEspnEntry): { positionalRanking?: number; totalRanking?: number } {
   const ratings = entry.ratings ?? {};
-  const rating = ratings["0"] ?? ratings[Object.keys(ratings)[0]];
-  return rating?.positionalRanking ?? 0;
+  return ratings["0"] ?? ratings[Object.keys(ratings)[0]] ?? {};
 }
 
 function realPositions(eligibleSlots: number[] | undefined, posMap: Record<number, string>, real: Set<string>): string[] {
@@ -280,6 +281,7 @@ function toIsoDate(parts: number[] | undefined): string | undefined {
 
 export function toFootballPlayerFields(entry: RawEspnEntry): EspnPlayerFields {
   const player = extractPlayer(entry);
+  const rating = extractRating(entry);
   const positions = realPositions(player.eligibleSlots, FOOTBALL_POSITION_MAP, FOOTBALL_REAL_POSITIONS);
   return {
     playerId: String(player.id),
@@ -287,7 +289,8 @@ export function toFootballPlayerFields(entry: RawEspnEntry): EspnPlayerFields {
     realTeam: FOOTBALL_PRO_TEAM_MAP[player.proTeamId] ?? "FA",
     position: positions[0] ?? "",
     positions,
-    ranking: extractRanking(entry),
+    ranking: rating.positionalRanking ?? 0,
+    overallRanking: rating.totalRanking ?? 0,
     injuryStatus: player.injuryStatus ?? "ACTIVE",
     estimatedReturnDate: toIsoDate(player.expectedReturnDate),
   };
@@ -295,6 +298,7 @@ export function toFootballPlayerFields(entry: RawEspnEntry): EspnPlayerFields {
 
 export function toBasketballPlayerFields(entry: RawEspnEntry): EspnPlayerFields {
   const player = extractPlayer(entry);
+  const rating = extractRating(entry);
   const positions = realPositions(player.eligibleSlots, BASKETBALL_POSITION_MAP, BASKETBALL_REAL_POSITIONS);
   // Basketball's raw defaultPositionId is 1-indexed against this same map
   // (1 => PG), unlike eligibleSlots/lineupSlotId which are 0-indexed.
@@ -305,7 +309,8 @@ export function toBasketballPlayerFields(entry: RawEspnEntry): EspnPlayerFields 
     realTeam: BASKETBALL_PRO_TEAM_MAP[player.proTeamId] ?? "FA",
     position: primary ?? positions[0] ?? "",
     positions,
-    ranking: extractRanking(entry),
+    ranking: rating.positionalRanking ?? 0,
+    overallRanking: rating.totalRanking ?? 0,
     injuryStatus: player.injuryStatus ?? "ACTIVE",
     estimatedReturnDate: toIsoDate(player.expectedReturnDate),
   };

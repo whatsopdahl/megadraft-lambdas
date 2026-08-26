@@ -12,6 +12,7 @@ interface PlayerInput {
   position: string;
   positions?: string[];
   ranking?: number;
+  overallRanking?: number;
   injuryStatus?: string;
   estimatedReturnDate?: string;
 }
@@ -72,6 +73,7 @@ async function main(): Promise<void> {
     position: input.position,
     positions: input.positions ?? [input.position],
     ranking: input.ranking ?? 0,
+    overallRanking: input.overallRanking ?? 0,
     injuryStatus: input.injuryStatus ?? "ACTIVE",
     estimatedReturnDate: input.estimatedReturnDate,
   }));

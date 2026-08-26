@@ -39,6 +39,8 @@ export interface Player {
   positions: string[];
   /** ESPN's positional ranking (e.g. RB12). */
   ranking: number;
+  /** ESPN's overall ranking across all players in the sport, position-agnostic. */
+  overallRanking: number;
   /** ESPN injury status, e.g. "ACTIVE", "QUESTIONABLE", "OUT", "INJURY_RESERVE". */
   injuryStatus: string;
   /** Only present when ESPN reports one (typically while injured). */
