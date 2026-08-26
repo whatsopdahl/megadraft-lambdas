@@ -31,4 +31,7 @@ export const env = {
   get pickTimeoutFunctionArn() {
     return required("PICK_TIMEOUT_FUNCTION_ARN");
   },
+  get espnCredentialsSecretArn() {
+    return required("ESPN_CREDENTIALS_SECRET_ARN");
+  },
 };

@@ -10,6 +10,10 @@ interface PlayerInput {
   name: string;
   realTeam: string;
   position: string;
+  positions?: string[];
+  ranking?: number;
+  injuryStatus?: string;
+  estimatedReturnDate?: string;
 }
 
 async function main(): Promise<void> {
@@ -66,6 +70,10 @@ async function main(): Promise<void> {
     name: input.name,
     realTeam: input.realTeam,
     position: input.position,
+    positions: input.positions ?? [input.position],
+    ranking: input.ranking ?? 0,
+    injuryStatus: input.injuryStatus ?? "ACTIVE",
+    estimatedReturnDate: input.estimatedReturnDate,
   }));
 
   // Batch write in chunks of 25

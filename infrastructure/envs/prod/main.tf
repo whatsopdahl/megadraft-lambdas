@@ -57,3 +57,14 @@ module "rest_api" {
   websocket_execution_arn       = module.websocket_api.execution_arn
   websocket_management_endpoint = module.websocket_api.management_endpoint
 }
+
+module "player_sync" {
+  source = "../../modules/player-sync"
+
+  env                = var.env
+  lambda_dist_dir    = var.lambda_dist_dir
+  log_retention_days = var.log_retention_days
+
+  players_table_name = local.players_table_name
+  players_table_arn  = local.players_table_arn
+}

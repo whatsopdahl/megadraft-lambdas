@@ -35,6 +35,14 @@ export interface Player {
   name: string;
   realTeam: string;
   position: string;
+  /** All real (non-bench/IR/flex) positions this player is eligible at. */
+  positions: string[];
+  /** ESPN's positional ranking (e.g. RB12). */
+  ranking: number;
+  /** ESPN injury status, e.g. "ACTIVE", "QUESTIONABLE", "OUT", "INJURY_RESERVE". */
+  injuryStatus: string;
+  /** Only present when ESPN reports one (typically while injured). */
+  estimatedReturnDate?: string;
 }
 
 export interface DraftPick {
