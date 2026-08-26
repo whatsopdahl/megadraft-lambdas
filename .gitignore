@@ -6,3 +6,10 @@ dist/
 data/*.csv
 data/*.json
 !data/example-players.json
+
+.terraform/
+*.tfstate
+*.tfstate.backup
+crash.log
+override.tf
+override.tf.json
