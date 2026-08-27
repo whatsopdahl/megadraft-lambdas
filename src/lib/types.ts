@@ -56,6 +56,12 @@ export interface DraftPick {
   draftId: string;
   pickNumber: number;
   playerId: string;
+  // Denormalized off the Player record at pick time so clients (DraftLog,
+  // Roster) can render picks from WS/REST pick data alone, without also
+  // needing the full player pool.
+  playerName: string;
+  playerPosition: string;
+  sportLeague: SportLeague;
   fantasyTeamId: string;
   pickedByUserId: string | null;
   pickedAt: string;

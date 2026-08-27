@@ -100,10 +100,11 @@ resource "aws_iam_role_policy" "lambda_app" {
         ]
       },
       {
-        # makePick/pickTimeout write to the per-draft roster table created at
-        # draft-creation time (see modules/rest-api's createDraft handler).
+        # makePick/pickTimeout read (roster-capacity checks) and write to the
+        # per-draft roster table created at draft-creation time (see
+        # modules/rest-api's createDraft handler).
         Effect   = "Allow"
-        Action   = ["dynamodb:PutItem"]
+        Action   = ["dynamodb:PutItem", "dynamodb:Query"]
         Resource = "arn:aws:dynamodb:${data.aws_region.current.region}:${data.aws_caller_identity.current.account_id}:table/megadraft-*-rosters"
       },
       {
