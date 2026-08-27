@@ -85,7 +85,7 @@ export const handler: APIGatewayProxyWebsocketHandlerV2 = async (event) => {
           ExpressionAttributeNames: { "#status": "status" },
           ExpressionAttributeValues: {
             ":next": nextPickNumber,
-            ":deadline": nextDeadline,
+            ":deadline": nextDeadline ? nextDeadline.toISOString() : null,
             ":status": isLastPick ? "complete" : "active",
             ":newPlayer": [body.playerId],
             ":pickNumber": pickNumber,

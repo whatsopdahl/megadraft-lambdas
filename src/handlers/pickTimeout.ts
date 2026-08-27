@@ -53,7 +53,7 @@ export const handler = async (event: { draftId: string; pickNumber: number }): P
           ExpressionAttributeNames: { "#status": "status" },
           ExpressionAttributeValues: {
             ":next": nextPickNumber,
-            ":deadline": nextDeadline,
+            ":deadline": nextDeadline ? nextDeadline.toISOString() : null,
             ":status": isLastPick ? "complete" : "active",
             ":newPlayer": [autoPlayer.playerId],
             ":pickNumber": pickNumber,
