@@ -2,7 +2,7 @@ import type { APIGatewayProxyHandlerV2 } from "aws-lambda";
 import { PutCommand } from "@aws-sdk/lib-dynamodb";
 import { ddb } from "../lib/dynamo.js";
 import { env } from "../lib/env.js";
-import { requireAuth, jsonResponse, sanitizeDraft } from "../lib/http.js";
+import { requireAuth, jsonResponse } from "../lib/http.js";
 import { broadcastToDraft } from "../lib/broadcast.js";
 import { getDraft } from "../lib/draftRepo.js";
 
@@ -58,7 +58,7 @@ export const handler: APIGatewayProxyHandlerV2 = async (event) => {
 
     await broadcastToDraft(draftId, { type: "draftUpdated", draft });
 
-    return jsonResponse(200, { draft: sanitizeDraft(draft) });
+    return jsonResponse(200, { draft });
   } catch (error) {
     console.error("Update team error:", error);
     return jsonResponse(500, { message: "Failed to update team" });

@@ -9,7 +9,7 @@ data "aws_caller_identity" "current" {}
 data "aws_region" "current" {}
 
 locals {
-  handler_names = ["createDraft", "getDraft", "updateDraft", "joinDraft", "listMyDrafts", "updateTeam", "deleteDraft", "getPlayers", "searchDrafts"]
+  handler_names = ["createDraft", "getDraft", "updateDraft", "listMyDrafts", "updateTeam", "deleteDraft", "getPlayers"]
 
   # route_key => handler name
   route_to_handler = {
@@ -18,10 +18,8 @@ locals {
     "GET /drafts/{draftId}"         = "getDraft"
     "PATCH /drafts/{draftId}"       = "updateDraft"
     "DELETE /drafts/{draftId}"      = "deleteDraft"
-    "POST /drafts/{draftId}/join"   = "joinDraft"
     "PATCH /drafts/{draftId}/team"  = "updateTeam"
     "GET /drafts/{draftId}/players" = "getPlayers"
-    "GET /search/drafts"            = "searchDrafts"
   }
 
   common_env = {
@@ -89,13 +87,6 @@ resource "aws_iam_role_policy" "lambda_app" {
         Resource = "${var.connections_table_arn}/index/*"
       },
       {
-        # searchDrafts looks up drafts by name via the drafts table's byName
-        # GSI, so joiners can find a draftId from the name they were given.
-        Effect   = "Allow"
-        Action   = ["dynamodb:Query"]
-        Resource = "${var.drafts_table_arn}/index/*"
-      },
-      {
         # getPlayers reads the draft's full player pool to serve over REST
         # (too large to push through a WebSocket PostToConnection frame).
         Effect   = "Allow"
@@ -110,8 +101,8 @@ resource "aws_iam_role_policy" "lambda_app" {
         Resource = "arn:aws:dynamodb:${data.aws_region.current.region}:${data.aws_caller_identity.current.account_id}:table/megadraft-*-rosters"
       },
       {
-        # joinDraft/updateDraft broadcast draftUpdated into any WS clients
-        # already sitting in the draft room.
+        # updateDraft broadcasts draftUpdated into any WS clients already
+        # sitting in the draft room.
         Effect   = "Allow"
         Action   = ["execute-api:ManageConnections"]
         Resource = "${var.websocket_execution_arn}/*/*"

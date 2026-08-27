@@ -7,6 +7,10 @@ export type DraftStatus = "pending" | "active" | "complete";
 export interface FantasyTeam {
   fantasyTeamId: string;
   name: string;
+  // The commissioner-invited email that auto-claims this team - whoever logs
+  // in with a matching Google account email becomes ownerUserId, no separate
+  // join step or password required.
+  email: string;
   ownerUserId: string | null;
   color: string;
   autodraft: boolean;
@@ -16,7 +20,6 @@ export interface Draft {
   draftId: string;
   name: string;
   sportLeagues: SportLeague[];
-  draftPasswordHash: string;
   orderType: OrderType;
   pickTimerSeconds: number;
   totalRounds: number;
@@ -77,8 +80,8 @@ export interface ConnectionRecord {
 }
 
 // Inbound WebSocket action messages (client -> server), routed by "action".
-// createDraft/joinDraft live on the REST API (see handlers/createDraft.ts,
-// handlers/joinDraft.ts) - the WebSocket API is draft-room-only.
+// createDraft/updateDraft live on the REST API (see handlers/createDraft.ts,
+// handlers/updateDraft.ts) - the WebSocket API is draft-room-only.
 export type InboundMessage =
   | { action: "startDraft"; draftId: string }
   | { action: "makePick"; draftId: string; playerId: string }

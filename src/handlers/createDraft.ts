@@ -1,21 +1,20 @@
 import type { APIGatewayProxyHandlerV2 } from "aws-lambda";
 import { randomUUID } from "node:crypto";
-import { requireAuth, jsonResponse, sanitizeDraft } from "../lib/http.js";
+import { requireAuth, jsonResponse } from "../lib/http.js";
 import { putDraft } from "../lib/draftRepo.js";
 import { createRosterTable } from "../lib/rosterRepo.js";
-import { hashPassword } from "../lib/password.js";
+import { claimTeamsByEmail } from "../lib/teamClaims.js";
 import { DEFAULT_TEAM_COLORS } from "../lib/teamColors.js";
 import { computeTotalRounds, validateRosterConfig } from "../lib/rosterConfig.js";
 import type { Draft, OrderType } from "../lib/types.js";
 
 interface CreateDraftBody {
   name: string;
-  draftPassword: string;
   orderType: OrderType;
   pickTimerSeconds: number;
   rosterConfig: unknown;
   scheduledStartTime: string;
-  teamNames: string[];
+  teams: { name: string; email: string }[];
 }
 
 export const handler: APIGatewayProxyHandlerV2 = async (event) => {
@@ -30,13 +29,7 @@ export const handler: APIGatewayProxyHandlerV2 = async (event) => {
   try {
     const body = JSON.parse(event.body ?? "{}") as Partial<CreateDraftBody>;
 
-    if (
-      !body.name ||
-      !body.draftPassword ||
-      !body.orderType ||
-      !body.pickTimerSeconds ||
-      !body.scheduledStartTime
-    ) {
+    if (!body.name || !body.orderType || !body.pickTimerSeconds || !body.scheduledStartTime) {
       return jsonResponse(400, { message: "Missing required fields" });
     }
 
@@ -44,8 +37,12 @@ export const handler: APIGatewayProxyHandlerV2 = async (event) => {
       return jsonResponse(400, { message: "Invalid scheduledStartTime" });
     }
 
-    if (!Array.isArray(body.teamNames) || body.teamNames.length < 2) {
+    if (!Array.isArray(body.teams) || body.teams.length < 2) {
       return jsonResponse(400, { message: "A draft needs at least 2 teams" });
+    }
+
+    if (body.teams.some((t) => !t.name || !t.email)) {
+      return jsonResponse(400, { message: "Every team needs a name and an email" });
     }
 
     const rosterConfig = validateRosterConfig(body.rosterConfig);
@@ -58,12 +55,11 @@ export const handler: APIGatewayProxyHandlerV2 = async (event) => {
       return jsonResponse(400, { message: "Roster configuration must include at least one slot" });
     }
 
-    const draftPasswordHash = await hashPassword(body.draftPassword);
-
-    const teams = body.teamNames.map((name, i) => ({
+    const teams = body.teams.map(({ name, email }, i) => ({
       fantasyTeamId: randomUUID(),
       name,
-      ownerUserId: i === 0 ? user.userId : null,
+      email,
+      ownerUserId: null,
       color: DEFAULT_TEAM_COLORS[i % DEFAULT_TEAM_COLORS.length],
       autodraft: false,
     }));
@@ -74,14 +70,13 @@ export const handler: APIGatewayProxyHandlerV2 = async (event) => {
       draftId,
       name: body.name,
       sportLeagues: ["NBA", "NFL"],
-      draftPasswordHash,
       orderType: body.orderType,
       pickTimerSeconds: body.pickTimerSeconds,
       totalRounds,
       rosterConfig,
       scheduledStartTime: body.scheduledStartTime,
       status: "pending",
-      teams,
+      teams: claimTeamsByEmail(teams, user).teams,
       pickOrderTeamIds: teams.map((t) => t.fantasyTeamId),
       currentPickNumber: 1,
       currentPickDeadline: null,
@@ -93,7 +88,7 @@ export const handler: APIGatewayProxyHandlerV2 = async (event) => {
     await putDraft(draft);
     await createRosterTable(draftId);
 
-    return jsonResponse(201, { draft: sanitizeDraft(draft) });
+    return jsonResponse(201, { draft });
   } catch (error) {
     console.error("Create draft error:", error);
     return jsonResponse(500, { message: "Failed to create draft" });

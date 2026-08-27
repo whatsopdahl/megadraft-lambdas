@@ -3,10 +3,10 @@ import { randomUUID } from "node:crypto";
 import { PutCommand } from "@aws-sdk/lib-dynamodb";
 import { ddb } from "../lib/dynamo.js";
 import { env } from "../lib/env.js";
-import { requireAuth, jsonResponse, sanitizeDraft } from "../lib/http.js";
+import { requireAuth, jsonResponse } from "../lib/http.js";
 import { broadcastToDraft } from "../lib/broadcast.js";
 import { getDraft } from "../lib/draftRepo.js";
-import { hashPassword } from "../lib/password.js";
+import { claimTeamsByEmail } from "../lib/teamClaims.js";
 import { DEFAULT_TEAM_COLORS } from "../lib/teamColors.js";
 import { computeTotalRounds, validateRosterConfig } from "../lib/rosterConfig.js";
 import type { OrderType } from "../lib/types.js";
@@ -17,8 +17,7 @@ interface UpdateDraftBody {
   pickTimerSeconds?: number;
   rosterConfig?: unknown;
   scheduledStartTime?: string;
-  draftPassword?: string;
-  teamNames?: string[];
+  teams?: { name: string; email: string }[];
 }
 
 export const handler: APIGatewayProxyHandlerV2 = async (event) => {
@@ -78,29 +77,31 @@ export const handler: APIGatewayProxyHandlerV2 = async (event) => {
       }
       draft.scheduledStartTime = body.scheduledStartTime;
     }
-    if (body.draftPassword !== undefined) {
-      draft.draftPasswordHash = await hashPassword(body.draftPassword);
-    }
-    if (body.teamNames !== undefined) {
-      if (!Array.isArray(body.teamNames) || body.teamNames.length < 2) {
+    if (body.teams !== undefined) {
+      if (!Array.isArray(body.teams) || body.teams.length < 2) {
         return jsonResponse(400, { message: "A draft needs at least 2 teams" });
+      }
+      if (body.teams.some((t) => !t.name || !t.email)) {
+        return jsonResponse(400, { message: "Every team needs a name and an email" });
       }
 
       // A team's ownership/autodraft setting only needs to reset when its
-      // identity actually changes (renamed, or the slot is new) - otherwise
-      // an unrelated edit elsewhere in this form (e.g. the pick timer) would
-      // silently un-claim every already-claimed team.
-      draft.teams = body.teamNames.map((name, i) => {
+      // identity actually changes (renamed/re-invited, or the slot is new) -
+      // otherwise an unrelated edit elsewhere in this form (e.g. the pick
+      // timer) would silently un-claim every already-claimed team.
+      const teams = body.teams.map(({ name, email }, i) => {
         const existing = draft.teams[i];
-        const unchanged = existing?.name === name;
+        const unchanged = existing?.name === name && existing?.email === email;
         return {
           fantasyTeamId: existing?.fantasyTeamId ?? randomUUID(),
           name,
+          email,
           ownerUserId: unchanged ? (existing?.ownerUserId ?? null) : null,
           color: existing?.color ?? DEFAULT_TEAM_COLORS[i % DEFAULT_TEAM_COLORS.length],
           autodraft: unchanged ? (existing?.autodraft ?? false) : false,
         };
       });
+      draft.teams = claimTeamsByEmail(teams, user).teams;
       draft.pickOrderTeamIds = draft.teams.map((t) => t.fantasyTeamId);
     }
 
@@ -123,7 +124,7 @@ export const handler: APIGatewayProxyHandlerV2 = async (event) => {
 
     await broadcastToDraft(draftId, { type: "draftUpdated", draft });
 
-    return jsonResponse(200, { draft: sanitizeDraft(draft) });
+    return jsonResponse(200, { draft });
   } catch (error) {
     console.error("Update draft error:", error);
     return jsonResponse(500, { message: "Failed to update draft" });
