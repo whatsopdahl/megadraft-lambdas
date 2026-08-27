@@ -10,6 +10,7 @@ import { teamIdForPick } from "../lib/draftOrder.js";
 import { schedulePickTimeout, cancelPickTimeout } from "../lib/scheduler.js";
 import { addRosterEntry, getTeamRoster } from "../lib/rosterRepo.js";
 import { hasRosterCapacity } from "../lib/rosterConfig.js";
+import { triggerImmediateAutoPickIfEnabled } from "../lib/autoPick.js";
 import type { InboundMessage } from "../lib/types.js";
 
 export const handler: APIGatewayProxyWebsocketHandlerV2 = async (event) => {
@@ -139,6 +140,10 @@ export const handler: APIGatewayProxyWebsocketHandlerV2 = async (event) => {
 
     const updatedDraft = await getDraft(body.draftId);
     if (updatedDraft) {
+      if (!isLastPick) {
+        await triggerImmediateAutoPickIfEnabled(updatedDraft, nextPickNumber);
+      }
+
       await broadcastToDraft(body.draftId, {
         type: "pickMade",
         pick: {

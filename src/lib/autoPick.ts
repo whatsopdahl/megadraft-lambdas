@@ -1,4 +1,5 @@
 import { PutCommand, UpdateCommand } from "@aws-sdk/lib-dynamodb";
+import { LambdaClient, InvokeCommand } from "@aws-sdk/client-lambda";
 import { ddb } from "./dynamo.js";
 import { env } from "./env.js";
 import { getDraft } from "./draftRepo.js";
@@ -8,7 +9,40 @@ import { teamIdForPick } from "./draftOrder.js";
 import { schedulePickTimeout } from "./scheduler.js";
 import { addRosterEntry, getTeamRoster } from "./rosterRepo.js";
 import { hasRosterCapacity } from "./rosterConfig.js";
-import type { Player } from "./types.js";
+import type { Draft, Player } from "./types.js";
+
+const lambdaClient = new LambdaClient({});
+
+/**
+ * If the team now on the clock has autodraft enabled, immediately triggers
+ * their pick instead of leaving it to wait out the full pick timer - an
+ * autodraft team is assumed to have nobody connected to act on their turn,
+ * so there's no reason to wait. Fires the pickTimeout function as a
+ * fire-and-forget async ("Event") invocation rather than calling
+ * performAutoPick in-process, so a run of several consecutive autodraft
+ * teams each gets its own bounded Lambda invocation instead of recursing
+ * arbitrarily deep within one. schedulePickTimeout is still called
+ * alongside this everywhere it's used - that remains the durable fallback
+ * if this invoke never lands (throttling, etc).
+ */
+export async function triggerImmediateAutoPickIfEnabled(
+  draft: Pick<Draft, "pickOrderTeamIds" | "orderType" | "teams" | "draftId">,
+  pickNumber: number,
+): Promise<void> {
+  const onClockTeamId = teamIdForPick(draft, pickNumber);
+  const team = draft.teams.find((t) => t.fantasyTeamId === onClockTeamId);
+  if (!team?.autodraft) {
+    return;
+  }
+
+  await lambdaClient.send(
+    new InvokeCommand({
+      FunctionName: env.pickTimeoutFunctionArn,
+      InvocationType: "Event",
+      Payload: Buffer.from(JSON.stringify({ draftId: draft.draftId, pickNumber })),
+    }),
+  );
+}
 
 // ESPN's overall ranking is position-agnostic (1 = best); 0 means ESPN has no
 // overall rank for that player, so it must sort last, not first - mirrors
@@ -153,6 +187,7 @@ export async function performAutoPick(draftId: string, pickNumber: number): Prom
 
   await Promise.all([
     isLastPick ? Promise.resolve() : schedulePickTimeout(draftId, nextPickNumber, nextDeadline!),
+    isLastPick ? Promise.resolve() : triggerImmediateAutoPickIfEnabled(updatedDraft, nextPickNumber),
     broadcastToDraft(draftId, {
       type: "pickMade",
       pick: {

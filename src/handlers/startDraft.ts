@@ -6,6 +6,7 @@ import { getConnection } from "../lib/connection.js";
 import { sendToConnection, broadcastToDraft } from "../lib/broadcast.js";
 import { getDraft } from "../lib/draftRepo.js";
 import { schedulePickTimeout } from "../lib/scheduler.js";
+import { triggerImmediateAutoPickIfEnabled } from "../lib/autoPick.js";
 import type { InboundMessage } from "../lib/types.js";
 
 function fisherYatesShuffle(array: string[]): void {
@@ -74,7 +75,7 @@ export const handler: APIGatewayProxyWebsocketHandlerV2 = async (event) => {
       throw error;
     }
 
-    await schedulePickTimeout(body.draftId, 1, deadline);
+    await Promise.all([schedulePickTimeout(body.draftId, 1, deadline), triggerImmediateAutoPickIfEnabled(draft, 1)]);
 
     await broadcastToDraft(body.draftId, { type: "draftStarted", draft });
 

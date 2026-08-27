@@ -126,6 +126,15 @@ resource "aws_iam_role_policy" "lambda_app" {
         Resource = "arn:aws:scheduler:${data.aws_region.current.region}:${data.aws_caller_identity.current.account_id}:schedule/default/pt-*"
       },
       {
+        # Lets startDraft/makePick/pickTimeout/checkPickTimeout immediately
+        # kick off an autodraft team's pick (see lib/autoPick.ts's
+        # triggerImmediateAutoPickIfEnabled) instead of waiting for the pick
+        # timer, by self-invoking pickTimeout asynchronously.
+        Effect   = "Allow"
+        Action   = ["lambda:InvokeFunction"]
+        Resource = local.pick_timeout_arn
+      },
+      {
         Effect   = "Allow"
         Action   = ["iam:PassRole"]
         Resource = aws_iam_role.scheduler_invoke.arn
