@@ -16,7 +16,9 @@ export function claimTeamsByEmail(
 
   let changed = false;
   const claimed = teams.map((team) => {
-    if (!team.ownerUserId && team.email.toLowerCase() === user.email!.toLowerCase()) {
+    // Teams created before `email` existed on FantasyTeam won't have one -
+    // they simply can't be auto-claimed until the commissioner re-invites them.
+    if (!team.ownerUserId && team.email && team.email.toLowerCase() === user.email!.toLowerCase()) {
       changed = true;
       return { ...team, ownerUserId: user.userId };
     }
