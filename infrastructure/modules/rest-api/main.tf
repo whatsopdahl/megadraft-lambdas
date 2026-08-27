@@ -9,22 +9,24 @@ data "aws_caller_identity" "current" {}
 data "aws_region" "current" {}
 
 locals {
-  handler_names = ["createDraft", "getDraft", "updateDraft", "joinDraft", "listMyDrafts", "updateTeam", "deleteDraft"]
+  handler_names = ["createDraft", "getDraft", "updateDraft", "joinDraft", "listMyDrafts", "updateTeam", "deleteDraft", "getPlayers"]
 
   # route_key => handler name
   route_to_handler = {
-    "POST /drafts"                 = "createDraft"
-    "GET /drafts"                  = "listMyDrafts"
-    "GET /drafts/{draftId}"        = "getDraft"
-    "PATCH /drafts/{draftId}"      = "updateDraft"
-    "DELETE /drafts/{draftId}"     = "deleteDraft"
-    "POST /drafts/{draftId}/join"  = "joinDraft"
-    "PATCH /drafts/{draftId}/team" = "updateTeam"
+    "POST /drafts"                  = "createDraft"
+    "GET /drafts"                   = "listMyDrafts"
+    "GET /drafts/{draftId}"         = "getDraft"
+    "PATCH /drafts/{draftId}"       = "updateDraft"
+    "DELETE /drafts/{draftId}"      = "deleteDraft"
+    "POST /drafts/{draftId}/join"   = "joinDraft"
+    "PATCH /drafts/{draftId}/team"  = "updateTeam"
+    "GET /drafts/{draftId}/players" = "getPlayers"
   }
 
   common_env = {
     DRAFTS_TABLE                  = var.drafts_table_name
     CONNECTIONS_TABLE             = var.connections_table_name
+    PLAYERS_TABLE                 = var.players_table_name
     GOOGLE_CLIENT_ID              = var.google_client_id
     WEBSOCKET_MANAGEMENT_ENDPOINT = var.websocket_management_endpoint
   }
@@ -84,6 +86,13 @@ resource "aws_iam_role_policy" "lambda_app" {
         Effect   = "Allow"
         Action   = ["dynamodb:Query"]
         Resource = "${var.connections_table_arn}/index/*"
+      },
+      {
+        # getPlayers reads the draft's full player pool to serve over REST
+        # (too large to push through a WebSocket PostToConnection frame).
+        Effect   = "Allow"
+        Action   = ["dynamodb:Query"]
+        Resource = var.players_table_arn
       },
       {
         # createDraft provisions each draft's own roster table on the fly;

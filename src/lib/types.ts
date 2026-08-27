@@ -80,7 +80,7 @@ export type InboundMessage =
 
 // Outbound broadcast messages (server -> clients)
 export type OutboundMessage =
-  | { type: "draftState"; draft: Draft; picks: DraftPick[]; players: Player[] }
+  | { type: "draftState"; draft: Draft; picks: DraftPick[] }
   | { type: "pickMade"; pick: DraftPick; draft: Draft }
   | { type: "draftStarted"; draft: Draft }
   | { type: "draftUpdated"; draft: Draft }

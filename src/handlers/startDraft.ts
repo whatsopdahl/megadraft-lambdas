@@ -5,7 +5,6 @@ import { env } from "../lib/env.js";
 import { getConnection } from "../lib/connection.js";
 import { sendToConnection, broadcastToDraft } from "../lib/broadcast.js";
 import { getDraft } from "../lib/draftRepo.js";
-import { getPlayersForLeagues } from "../lib/players.js";
 import { schedulePickTimeout } from "../lib/scheduler.js";
 import type { InboundMessage } from "../lib/types.js";
 
@@ -77,10 +76,7 @@ export const handler: APIGatewayProxyWebsocketHandlerV2 = async (event) => {
 
     await schedulePickTimeout(body.draftId, 1, deadline);
 
-    const players = await getPlayersForLeagues(draft.sportLeagues);
-
     await broadcastToDraft(body.draftId, { type: "draftStarted", draft });
-    await broadcastToDraft(body.draftId, { type: "draftState", draft, picks: [], players });
 
     return { statusCode: 200, body: "" };
   } catch (error) {
