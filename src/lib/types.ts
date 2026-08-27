@@ -64,7 +64,7 @@ export interface DraftPick {
 
 export interface ConnectionRecord {
   connectionId: string;
-  draftId: string;
+  draftId?: string;
   userId: string;
   connectedAt: string;
   expiresAt: number;

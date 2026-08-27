@@ -1,5 +1,5 @@
 import { APIGatewayProxyWebsocketHandlerV2 } from "aws-lambda";
-import { getConnection } from "../lib/connection.js";
+import { attachDraftToConnection, getConnection } from "../lib/connection.js";
 import { sendToConnection } from "../lib/broadcast.js";
 import { getDraft, getPicksForDraft } from "../lib/draftRepo.js";
 import { getPlayersForLeagues } from "../lib/players.js";
@@ -25,6 +25,8 @@ export const handler: APIGatewayProxyWebsocketHandlerV2 = async (event) => {
       await sendToConnection(connectionId, { type: "error", message: "Draft not found" });
       return { statusCode: 200, body: "" };
     }
+
+    await attachDraftToConnection(connectionId, body.draftId);
 
     const picks = await getPicksForDraft(body.draftId);
     const players = await getPlayersForLeagues(draft.sportLeagues);

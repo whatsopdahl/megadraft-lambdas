@@ -8,7 +8,6 @@ const CONNECTION_TTL_SECONDS = 24 * 60 * 60;
 export async function createConnection(connectionId: string, userId: string): Promise<void> {
   const record: ConnectionRecord = {
     connectionId,
-    draftId: "",
     userId,
     connectedAt: new Date().toISOString(),
     expiresAt: Math.floor(Date.now() / 1000) + CONNECTION_TTL_SECONDS,
