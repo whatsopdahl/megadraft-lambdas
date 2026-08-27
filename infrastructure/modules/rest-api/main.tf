@@ -9,7 +9,7 @@ data "aws_caller_identity" "current" {}
 data "aws_region" "current" {}
 
 locals {
-  handler_names = ["createDraft", "getDraft", "updateDraft", "listMyDrafts", "updateTeam", "deleteDraft", "getPlayers"]
+  handler_names = ["createDraft", "getDraft", "updateDraft", "listMyDrafts", "updateTeam", "deleteDraft", "getPlayers", "getDraftPicks"]
 
   # route_key => handler name
   route_to_handler = {
@@ -20,12 +20,14 @@ locals {
     "DELETE /drafts/{draftId}"      = "deleteDraft"
     "PATCH /drafts/{draftId}/team"  = "updateTeam"
     "GET /drafts/{draftId}/players" = "getPlayers"
+    "GET /drafts/{draftId}/picks"   = "getDraftPicks"
   }
 
   common_env = {
     DRAFTS_TABLE                  = var.drafts_table_name
     CONNECTIONS_TABLE             = var.connections_table_name
     PLAYERS_TABLE                 = var.players_table_name
+    DRAFT_PICKS_TABLE             = var.draft_picks_table_name
     GOOGLE_CLIENT_ID              = var.google_client_id
     WEBSOCKET_MANAGEMENT_ENDPOINT = var.websocket_management_endpoint
   }
@@ -78,8 +80,10 @@ resource "aws_iam_role_policy" "lambda_app" {
         Effect = "Allow"
         Action = [
           "dynamodb:GetItem", "dynamodb:PutItem", "dynamodb:UpdateItem", "dynamodb:DeleteItem", "dynamodb:Scan",
+          # Query is for getDraftPicks reading a draft's picks table.
+          "dynamodb:Query",
         ]
-        Resource = [var.drafts_table_arn]
+        Resource = [var.drafts_table_arn, var.draft_picks_table_arn]
       },
       {
         Effect   = "Allow"

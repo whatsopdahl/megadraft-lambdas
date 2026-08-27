@@ -52,6 +52,8 @@ module "rest_api" {
   connections_table_arn  = local.connections_table_arn
   players_table_name     = local.players_table_name
   players_table_arn      = local.players_table_arn
+  draft_picks_table_name = local.draft_picks_table_name
+  draft_picks_table_arn  = local.draft_picks_table_arn
 
   google_client_id   = var.google_client_id
   cors_allow_origins = local.cors_allow_origins

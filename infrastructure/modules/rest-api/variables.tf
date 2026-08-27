@@ -18,6 +18,8 @@ variable "connections_table_name" { type = string }
 variable "connections_table_arn" { type = string }
 variable "players_table_name" { type = string }
 variable "players_table_arn" { type = string }
+variable "draft_picks_table_name" { type = string }
+variable "draft_picks_table_arn" { type = string }
 
 variable "google_client_id" {
   description = "Google OAuth client ID used as the audience when verifying Google ID tokens"
