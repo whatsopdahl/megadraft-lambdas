@@ -76,15 +76,21 @@ export const handler: APIGatewayProxyHandlerV2 = async (event) => {
         return jsonResponse(400, { message: "A draft needs at least 2 teams" });
       }
 
-      // Team identities change with the name list, so previously claimed
-      // ownership doesn't carry over - everyone re-claims via joinDraft.
-      draft.teams = body.teamNames.map((name, i) => ({
-        fantasyTeamId: draft.teams[i]?.fantasyTeamId ?? randomUUID(),
-        name,
-        ownerUserId: null,
-        color: draft.teams[i]?.color ?? DEFAULT_TEAM_COLORS[i % DEFAULT_TEAM_COLORS.length],
-        autodraft: false,
-      }));
+      // A team's ownership/autodraft setting only needs to reset when its
+      // identity actually changes (renamed, or the slot is new) - otherwise
+      // an unrelated edit elsewhere in this form (e.g. the pick timer) would
+      // silently un-claim every already-claimed team.
+      draft.teams = body.teamNames.map((name, i) => {
+        const existing = draft.teams[i];
+        const unchanged = existing?.name === name;
+        return {
+          fantasyTeamId: existing?.fantasyTeamId ?? randomUUID(),
+          name,
+          ownerUserId: unchanged ? (existing?.ownerUserId ?? null) : null,
+          color: existing?.color ?? DEFAULT_TEAM_COLORS[i % DEFAULT_TEAM_COLORS.length],
+          autodraft: unchanged ? (existing?.autodraft ?? false) : false,
+        };
+      });
       draft.pickOrderTeamIds = draft.teams.map((t) => t.fantasyTeamId);
     }
 
