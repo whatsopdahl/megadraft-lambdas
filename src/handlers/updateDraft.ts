@@ -8,13 +8,14 @@ import { broadcastToDraft } from "../lib/broadcast.js";
 import { getDraft } from "../lib/draftRepo.js";
 import { hashPassword } from "../lib/password.js";
 import { DEFAULT_TEAM_COLORS } from "../lib/teamColors.js";
+import { computeTotalRounds, validateRosterConfig } from "../lib/rosterConfig.js";
 import type { OrderType } from "../lib/types.js";
 
 interface UpdateDraftBody {
   name?: string;
   orderType?: OrderType;
   pickTimerSeconds?: number;
-  totalRounds?: number;
+  rosterConfig?: unknown;
   scheduledStartTime?: string;
   draftPassword?: string;
   teamNames?: string[];
@@ -59,8 +60,17 @@ export const handler: APIGatewayProxyHandlerV2 = async (event) => {
     if (body.pickTimerSeconds !== undefined) {
       draft.pickTimerSeconds = body.pickTimerSeconds;
     }
-    if (body.totalRounds !== undefined) {
-      draft.totalRounds = body.totalRounds;
+    if (body.rosterConfig !== undefined) {
+      const rosterConfig = validateRosterConfig(body.rosterConfig);
+      if (!rosterConfig) {
+        return jsonResponse(400, { message: "Invalid roster configuration" });
+      }
+      const totalRounds = computeTotalRounds(rosterConfig);
+      if (totalRounds === 0) {
+        return jsonResponse(400, { message: "Roster configuration must include at least one slot" });
+      }
+      draft.rosterConfig = rosterConfig;
+      draft.totalRounds = totalRounds;
     }
     if (body.scheduledStartTime !== undefined) {
       if (Number.isNaN(new Date(body.scheduledStartTime).getTime())) {

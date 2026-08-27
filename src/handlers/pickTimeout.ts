@@ -6,7 +6,8 @@ import { getPlayersForLeagues } from "../lib/players.js";
 import { broadcastToDraft } from "../lib/broadcast.js";
 import { teamIdForPick } from "../lib/draftOrder.js";
 import { schedulePickTimeout } from "../lib/scheduler.js";
-import { addRosterEntry } from "../lib/rosterRepo.js";
+import { addRosterEntry, getTeamRoster } from "../lib/rosterRepo.js";
+import { hasRosterCapacity } from "../lib/rosterConfig.js";
 
 export const handler = async (event: { draftId: string; pickNumber: number }): Promise<void> => {
   try {
@@ -26,7 +27,14 @@ export const handler = async (event: { draftId: string; pickNumber: number }): P
       return;
     }
 
-    const autoPlayer = available[0];
+    const teamRoster = await getTeamRoster(event.draftId, onClockTeamId);
+    const eligible = available.filter((p) => hasRosterCapacity(draft.rosterConfig, teamRoster, p));
+    if (eligible.length === 0) {
+      console.error(
+        `No roster-eligible players for auto-pick in draft ${event.draftId}, pick ${event.pickNumber} - falling back to best available`,
+      );
+    }
+    const autoPlayer = eligible.length > 0 ? eligible[0] : available[0];
 
     const pickNumber = event.pickNumber;
     const totalPicks = draft.teams.length * draft.totalRounds;
@@ -80,6 +88,8 @@ export const handler = async (event: { draftId: string; pickNumber: number }): P
     await addRosterEntry(event.draftId, {
       fantasyTeamId: onClockTeamId,
       playerId: autoPlayer.playerId,
+      position: autoPlayer.position,
+      sportLeague: autoPlayer.sportLeague,
       pickNumber,
       pickedByUserId: null,
       pickedAt,

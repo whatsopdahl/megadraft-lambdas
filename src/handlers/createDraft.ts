@@ -5,6 +5,7 @@ import { putDraft } from "../lib/draftRepo.js";
 import { createRosterTable } from "../lib/rosterRepo.js";
 import { hashPassword } from "../lib/password.js";
 import { DEFAULT_TEAM_COLORS } from "../lib/teamColors.js";
+import { computeTotalRounds, validateRosterConfig } from "../lib/rosterConfig.js";
 import type { Draft, OrderType } from "../lib/types.js";
 
 interface CreateDraftBody {
@@ -12,7 +13,7 @@ interface CreateDraftBody {
   draftPassword: string;
   orderType: OrderType;
   pickTimerSeconds: number;
-  totalRounds: number;
+  rosterConfig: unknown;
   scheduledStartTime: string;
   teamNames: string[];
 }
@@ -34,7 +35,6 @@ export const handler: APIGatewayProxyHandlerV2 = async (event) => {
       !body.draftPassword ||
       !body.orderType ||
       !body.pickTimerSeconds ||
-      !body.totalRounds ||
       !body.scheduledStartTime
     ) {
       return jsonResponse(400, { message: "Missing required fields" });
@@ -46,6 +46,16 @@ export const handler: APIGatewayProxyHandlerV2 = async (event) => {
 
     if (!Array.isArray(body.teamNames) || body.teamNames.length < 2) {
       return jsonResponse(400, { message: "A draft needs at least 2 teams" });
+    }
+
+    const rosterConfig = validateRosterConfig(body.rosterConfig);
+    if (!rosterConfig) {
+      return jsonResponse(400, { message: "Invalid roster configuration" });
+    }
+
+    const totalRounds = computeTotalRounds(rosterConfig);
+    if (totalRounds === 0) {
+      return jsonResponse(400, { message: "Roster configuration must include at least one slot" });
     }
 
     const draftPasswordHash = await hashPassword(body.draftPassword);
@@ -67,7 +77,8 @@ export const handler: APIGatewayProxyHandlerV2 = async (event) => {
       draftPasswordHash,
       orderType: body.orderType,
       pickTimerSeconds: body.pickTimerSeconds,
-      totalRounds: body.totalRounds,
+      totalRounds,
+      rosterConfig,
       scheduledStartTime: body.scheduledStartTime,
       status: "pending",
       teams,

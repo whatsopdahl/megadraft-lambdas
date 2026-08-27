@@ -1,12 +1,15 @@
 import { CreateTableCommand, DeleteTableCommand, DynamoDBClient } from "@aws-sdk/client-dynamodb";
-import { PutCommand } from "@aws-sdk/lib-dynamodb";
+import { PutCommand, QueryCommand } from "@aws-sdk/lib-dynamodb";
 import { ddb } from "./dynamo.js";
+import type { SportLeague } from "./types.js";
 
 const rawClient = new DynamoDBClient({});
 
 export interface RosterEntry {
   fantasyTeamId: string;
   playerId: string;
+  position: string;
+  sportLeague: SportLeague;
   pickNumber: number;
   pickedByUserId: string | null;
   pickedAt: string;
@@ -63,4 +66,16 @@ export async function addRosterEntry(draftId: string, entry: RosterEntry): Promi
       Item: entry,
     }),
   );
+}
+
+export async function getTeamRoster(draftId: string, fantasyTeamId: string): Promise<RosterEntry[]> {
+  const result = await ddb.send(
+    new QueryCommand({
+      TableName: rosterTableName(draftId),
+      KeyConditionExpression: "fantasyTeamId = :t",
+      ExpressionAttributeValues: { ":t": fantasyTeamId },
+    }),
+  );
+
+  return (result.Items ?? []) as RosterEntry[];
 }

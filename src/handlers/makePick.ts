@@ -8,7 +8,8 @@ import { getDraft } from "../lib/draftRepo.js";
 import { getPlayerInLeagues } from "../lib/players.js";
 import { teamIdForPick } from "../lib/draftOrder.js";
 import { schedulePickTimeout, cancelPickTimeout } from "../lib/scheduler.js";
-import { addRosterEntry } from "../lib/rosterRepo.js";
+import { addRosterEntry, getTeamRoster } from "../lib/rosterRepo.js";
+import { hasRosterCapacity } from "../lib/rosterConfig.js";
 import type { InboundMessage } from "../lib/types.js";
 
 export const handler: APIGatewayProxyWebsocketHandlerV2 = async (event) => {
@@ -55,6 +56,15 @@ export const handler: APIGatewayProxyWebsocketHandlerV2 = async (event) => {
     const player = await getPlayerInLeagues(draft.sportLeagues, body.playerId);
     if (!player) {
       await sendToConnection(connectionId, { type: "error", message: "Invalid player" });
+      return { statusCode: 200, body: "" };
+    }
+
+    const teamRoster = await getTeamRoster(body.draftId, onClockTeamId);
+    if (!hasRosterCapacity(draft.rosterConfig, teamRoster, player)) {
+      await sendToConnection(connectionId, {
+        type: "error",
+        message: `No open ${player.position} or bench slot for that team`,
+      });
       return { statusCode: 200, body: "" };
     }
 
@@ -111,6 +121,8 @@ export const handler: APIGatewayProxyWebsocketHandlerV2 = async (event) => {
     await addRosterEntry(body.draftId, {
       fantasyTeamId: onClockTeamId,
       playerId: body.playerId,
+      position: player.position,
+      sportLeague: player.sportLeague,
       pickNumber,
       pickedByUserId: userId,
       pickedAt,
