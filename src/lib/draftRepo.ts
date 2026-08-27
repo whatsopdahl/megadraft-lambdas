@@ -14,6 +14,21 @@ export async function getDraft(draftId: string): Promise<Draft | undefined> {
   return result.Item as Draft | undefined;
 }
 
+/** Finds every draft with this exact name - names aren't guaranteed unique. */
+export async function getDraftsByName(name: string): Promise<Draft[]> {
+  const result = await ddb.send(
+    new QueryCommand({
+      TableName: env.draftsTable,
+      IndexName: "byName",
+      KeyConditionExpression: "#name = :name",
+      ExpressionAttributeNames: { "#name": "name" },
+      ExpressionAttributeValues: { ":name": name },
+    }),
+  );
+
+  return (result.Items ?? []) as Draft[];
+}
+
 export async function putDraft(draft: Draft): Promise<void> {
   await ddb.send(
     new PutCommand({

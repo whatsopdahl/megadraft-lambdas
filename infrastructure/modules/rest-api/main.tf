@@ -9,7 +9,7 @@ data "aws_caller_identity" "current" {}
 data "aws_region" "current" {}
 
 locals {
-  handler_names = ["createDraft", "getDraft", "updateDraft", "joinDraft", "listMyDrafts", "updateTeam", "deleteDraft", "getPlayers"]
+  handler_names = ["createDraft", "getDraft", "updateDraft", "joinDraft", "listMyDrafts", "updateTeam", "deleteDraft", "getPlayers", "searchDrafts"]
 
   # route_key => handler name
   route_to_handler = {
@@ -21,6 +21,7 @@ locals {
     "POST /drafts/{draftId}/join"   = "joinDraft"
     "PATCH /drafts/{draftId}/team"  = "updateTeam"
     "GET /drafts/{draftId}/players" = "getPlayers"
+    "GET /search/drafts"            = "searchDrafts"
   }
 
   common_env = {
@@ -86,6 +87,13 @@ resource "aws_iam_role_policy" "lambda_app" {
         Effect   = "Allow"
         Action   = ["dynamodb:Query"]
         Resource = "${var.connections_table_arn}/index/*"
+      },
+      {
+        # searchDrafts looks up drafts by name via the drafts table's byName
+        # GSI, so joiners can find a draftId from the name they were given.
+        Effect   = "Allow"
+        Action   = ["dynamodb:Query"]
+        Resource = "${var.drafts_table_arn}/index/*"
       },
       {
         # getPlayers reads the draft's full player pool to serve over REST
