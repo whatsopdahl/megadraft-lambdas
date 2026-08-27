@@ -13,18 +13,26 @@ locals {
   # WebSocket API is draft-room-only.
   handler_names = [
     "connect", "disconnect", "default",
-    "startDraft", "makePick", "pickTimeout", "getDraftState",
+    "startDraft", "makePick", "pickTimeout", "getDraftState", "checkPickTimeout",
   ]
 
   # Routes served by API Gateway (excludes pickTimeout, which EventBridge
   # Scheduler invokes directly via IAM role, not through the WebSocket API).
   route_to_handler = {
-    "$connect"      = "connect"
-    "$disconnect"   = "disconnect"
-    "$default"      = "default"
-    "startDraft"    = "startDraft"
-    "makePick"      = "makePick"
-    "getDraftState" = "getDraftState"
+    "$connect"         = "connect"
+    "$disconnect"      = "disconnect"
+    "$default"         = "default"
+    "startDraft"       = "startDraft"
+    "makePick"         = "makePick"
+    "getDraftState"    = "getDraftState"
+    "checkPickTimeout" = "checkPickTimeout"
+  }
+
+  # pickTimeout is the durable EventBridge-invoked fallback and stays
+  # cold-start-prone by nature of being invoked sporadically - a bit more
+  # memory (Lambda allocates CPU proportionally) shrinks its init/duration.
+  memory_overrides = {
+    pickTimeout = 512
   }
 
   pick_timeout_function_name = "fantasy-draft-pickTimeout-${var.env}"
@@ -175,7 +183,7 @@ resource "aws_lambda_function" "handler" {
   filename         = data.archive_file.handler[each.key].output_path
   source_code_hash = data.archive_file.handler[each.key].output_base64sha256
   timeout          = 10
-  memory_size      = 256
+  memory_size      = lookup(local.memory_overrides, each.key, 256)
 
   environment {
     variables = local.common_env

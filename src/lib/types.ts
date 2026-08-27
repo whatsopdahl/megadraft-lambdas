@@ -85,7 +85,12 @@ export interface ConnectionRecord {
 export type InboundMessage =
   | { action: "startDraft"; draftId: string }
   | { action: "makePick"; draftId: string; playerId: string }
-  | { action: "getDraftState"; draftId: string };
+  | { action: "getDraftState"; draftId: string }
+  // Sent by connected clients the instant their local countdown reaches the
+  // pick deadline, so the auto-pick doesn't have to wait on EventBridge
+  // Scheduler jitter - pickNumber is a diagnostic echo only, never trusted
+  // for the server-side timing decision (see handlers/checkPickTimeout.ts).
+  | { action: "checkPickTimeout"; draftId: string; pickNumber: number };
 
 // Outbound broadcast messages (server -> clients)
 export type OutboundMessage =
