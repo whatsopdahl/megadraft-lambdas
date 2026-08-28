@@ -7,7 +7,8 @@
   "scripts": {
     "build": "node esbuild.config.mjs",
     "typecheck": "tsc --noEmit",
-    "seed:players": "tsx scripts/seed-players.ts"
+    "seed:players": "tsx scripts/seed-players.ts",
+    "generate:rankings": "tsx scripts/generate-overall-rankings.ts"
   },
   "dependencies": {
     "@aws-sdk/client-dynamodb": "^3.700.0",

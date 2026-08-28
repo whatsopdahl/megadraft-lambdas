@@ -10,6 +10,7 @@ import {
   toFootballPlayerFields,
   type EspnCookies,
 } from "../lib/espn.js";
+import { getOverallRanking } from "../lib/overallRankings.js";
 import type { Player } from "../lib/types.js";
 
 // Manually invoked (`aws lambda invoke`) - see README for the Secrets
@@ -51,7 +52,12 @@ async function fetchNflPlayers(secret: EspnSecret, cookies: EspnCookies, maxPlay
   for (const group of NFL_POSITION_GROUPS) {
     const size = maxPlayersPerLeague === undefined ? group.size : Math.min(group.size, maxPlayersPerLeague);
     const rawPlayers = await fetchFreeAgents("nfl", leagueId, year, week, size, group.slotId, cookies);
-    players.push(...rawPlayers.map((raw) => ({ sportLeague: "NFL" as const, ...toFootballPlayerFields(raw) })));
+    players.push(
+      ...rawPlayers.map((raw) => {
+        const fields = toFootballPlayerFields(raw);
+        return { sportLeague: "NFL" as const, ...fields, overallRanking: getOverallRanking("NFL", fields.name) };
+      }),
+    );
   }
   return players;
 }
@@ -62,7 +68,10 @@ async function fetchNbaPlayers(secret: EspnSecret, cookies: EspnCookies, maxPlay
 
   const size = maxPlayersPerLeague === undefined ? NBA_ALL_PLAYERS_SIZE : Math.min(NBA_ALL_PLAYERS_SIZE, maxPlayersPerLeague);
   const rawPlayers = await fetchFreeAgents("nba", leagueId, year, week, size, undefined, cookies);
-  return rawPlayers.map((raw) => ({ sportLeague: "NBA" as const, ...toBasketballPlayerFields(raw) }));
+  return rawPlayers.map((raw) => {
+    const fields = toBasketballPlayerFields(raw);
+    return { sportLeague: "NBA" as const, ...fields, overallRanking: getOverallRanking("NBA", fields.name) };
+  });
 }
 
 async function batchWritePlayers(players: Player[]): Promise<void> {
