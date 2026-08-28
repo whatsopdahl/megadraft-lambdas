@@ -17,7 +17,7 @@ interface UpdateDraftBody {
   pickTimerSeconds?: number;
   rosterConfig?: unknown;
   scheduledStartTime?: string;
-  teams?: { name: string; email: string; fantasyTeamId?: string }[];
+  teams?: { name: string; email: string; fantasyTeamId?: string; autodraft?: boolean }[];
 }
 
 export const handler: APIGatewayProxyHandlerV2 = async (event) => {
@@ -85,15 +85,17 @@ export const handler: APIGatewayProxyHandlerV2 = async (event) => {
         return jsonResponse(400, { message: "Every team needs a name and an email" });
       }
 
-      // A team's ownership/autodraft setting only needs to reset when its
-      // identity actually changes (renamed/re-invited, or the slot is new) -
+      // A team's ownership setting only needs to reset when its identity
+      // actually changes (renamed/re-invited, or the slot is new) -
       // otherwise an unrelated edit elsewhere in this form (e.g. the pick
       // timer) would silently un-claim every already-claimed team. Teams are
       // matched by fantasyTeamId rather than array index so that reordering
       // the list (to set draft order) doesn't get misread as every team
-      // changing identity.
+      // changing identity. Autodraft is commissioner-settable directly from
+      // this form, so an explicit value in the request always wins; only
+      // fall back to the identity-based reset when the field is omitted.
       const existingById = new Map(draft.teams.map((t) => [t.fantasyTeamId, t]));
-      const teams = body.teams.map(({ name, email, fantasyTeamId }, i) => {
+      const teams = body.teams.map(({ name, email, fantasyTeamId, autodraft }, i) => {
         const existing = fantasyTeamId ? existingById.get(fantasyTeamId) : undefined;
         const unchanged = !!existing && existing.name === name && existing.email === email;
         return {
@@ -102,7 +104,7 @@ export const handler: APIGatewayProxyHandlerV2 = async (event) => {
           email,
           ownerUserId: unchanged ? (existing?.ownerUserId ?? null) : null,
           color: existing?.color ?? DEFAULT_TEAM_COLORS[i % DEFAULT_TEAM_COLORS.length],
-          autodraft: unchanged ? (existing?.autodraft ?? false) : false,
+          autodraft: autodraft !== undefined ? autodraft : unchanged ? (existing?.autodraft ?? false) : false,
         };
       });
       draft.teams = claimTeamsByEmail(teams, user).teams;
