@@ -203,6 +203,16 @@ resource "aws_lambda_function" "handler" {
   depends_on = [aws_cloudwatch_log_group.handler]
 }
 
+# pickTimeout is invoked recursively by design (see lambda:InvokeFunction
+# grant above): makePick/startDraft/pickTimeout/checkPickTimeout all
+# self-invoke pickTimeout to trigger immediate autopicks. Without this,
+# AWS Lambda's automatic recursive-loop detection can mistake that pattern
+# for a runaway loop and terminate the function.
+resource "aws_lambda_function_recursion_config" "pick_timeout" {
+  function_name  = aws_lambda_function.handler["pickTimeout"].function_name
+  recursive_loop = "Allow"
+}
+
 resource "aws_lambda_permission" "apigw" {
   for_each      = toset(values(local.route_to_handler))
   statement_id  = "AllowAPIGatewayInvoke"
