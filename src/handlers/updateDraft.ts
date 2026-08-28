@@ -17,7 +17,7 @@ interface UpdateDraftBody {
   pickTimerSeconds?: number;
   rosterConfig?: unknown;
   scheduledStartTime?: string;
-  teams?: { name: string; email: string }[];
+  teams?: { name: string; email: string; fantasyTeamId?: string }[];
 }
 
 export const handler: APIGatewayProxyHandlerV2 = async (event) => {
@@ -88,10 +88,14 @@ export const handler: APIGatewayProxyHandlerV2 = async (event) => {
       // A team's ownership/autodraft setting only needs to reset when its
       // identity actually changes (renamed/re-invited, or the slot is new) -
       // otherwise an unrelated edit elsewhere in this form (e.g. the pick
-      // timer) would silently un-claim every already-claimed team.
-      const teams = body.teams.map(({ name, email }, i) => {
-        const existing = draft.teams[i];
-        const unchanged = existing?.name === name && existing?.email === email;
+      // timer) would silently un-claim every already-claimed team. Teams are
+      // matched by fantasyTeamId rather than array index so that reordering
+      // the list (to set draft order) doesn't get misread as every team
+      // changing identity.
+      const existingById = new Map(draft.teams.map((t) => [t.fantasyTeamId, t]));
+      const teams = body.teams.map(({ name, email, fantasyTeamId }, i) => {
+        const existing = fantasyTeamId ? existingById.get(fantasyTeamId) : undefined;
+        const unchanged = !!existing && existing.name === name && existing.email === email;
         return {
           fantasyTeamId: existing?.fantasyTeamId ?? randomUUID(),
           name,
