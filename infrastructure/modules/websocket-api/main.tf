@@ -13,7 +13,7 @@ locals {
   # WebSocket API is draft-room-only.
   handler_names = [
     "connect", "disconnect", "default",
-    "startDraft", "makePick", "pickTimeout", "getDraftState", "checkPickTimeout",
+    "startDraft", "pauseDraft", "resumeDraft", "makePick", "pickTimeout", "getDraftState", "checkPickTimeout",
   ]
 
   # Routes served by API Gateway (excludes pickTimeout, which EventBridge
@@ -23,6 +23,8 @@ locals {
     "$disconnect"      = "disconnect"
     "$default"         = "default"
     "startDraft"       = "startDraft"
+    "pauseDraft"       = "pauseDraft"
+    "resumeDraft"      = "resumeDraft"
     "makePick"         = "makePick"
     "getDraftState"    = "getDraftState"
     "checkPickTimeout" = "checkPickTimeout"
@@ -69,7 +71,7 @@ resource "aws_apigatewayv2_stage" "this" {
   auto_deploy = true
 }
 
-# ---- Lambda execution role (shared by all 9 functions) ----
+# ---- Lambda execution role (shared by all handler functions) ----
 resource "aws_iam_role" "lambda_exec" {
   name = "fantasy-draft-lambda-exec-${var.env}"
   assume_role_policy = jsonencode({
